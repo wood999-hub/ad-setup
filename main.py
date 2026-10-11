@@ -40,8 +40,13 @@ def kw_path(args) -> Path:
 
 
 def read_csv(path: Path) -> list[dict]:
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
+    for enc in ("utf-8-sig", "cp949"):  # 엑셀에서 저장하면 cp949 로 바뀔 수 있음
+        try:
+            with open(path, newline="", encoding=enc) as f:
+                rows = list(csv.DictReader(f))
+            break
+        except UnicodeDecodeError:
+            continue
     for r in rows:
         r["bid"] = int(str(r["bid"]).replace(",", "").strip() or 0)
     return rows
