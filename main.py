@@ -5,6 +5,7 @@
   python main.py check              # 성과 수집 + 세팅값이 ads.yaml 과 같은지 확인
   python main.py adjust             # 규칙대로 입찰가 조정안 출력 (기본: 미리보기만)
   python main.py adjust --apply     # 조정안을 실제로 반영
+  python main.py backup --folder 폴더  # 다운받은 키워드 엑셀들을 하나로 합쳐 백업
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
 """
@@ -123,19 +124,62 @@ def cmd_adjust(sel, args):
         print(f"\n{len(changes)}건 반영 완료 → data/changes.csv 기록, {args.ads} 갱신")
 
 
+def cmd_backup(sel, args):
+    from pathlib import Path
+
+    from adbot import backup
+
+    folder = Path(args.folder).expanduser()
+    merged, report = backup.collect(folder)
+    print(f"== 파일별 결과 ({folder}) ==")
+    for r in report:
+        if "error" in r:
+            print(f"  ✗ {r['file']}: {r['error']}")
+        else:
+            missing = [k for k, v in r["mapping"].items() if v is None]
+            note = f" (못 찾은 칸: {', '.join(missing)})" if missing else ""
+            print(f"  ✓ {r['file']}: 키워드 {r['rows']}개{note}")
+
+    if merged.empty:
+        print("\n읽은 키워드가 없습니다.")
+        return
+
+    # 같은 내용을 두 번 받은 파일 찾기
+    sigs = {}
+    for name, g in merged.groupby("source_file"):
+        sig = tuple(sorted(zip(g["ad_id"].astype(str), g["keyword"])))
+        sigs.setdefault(sig, []).append(name)
+    for names in sigs.values():
+        if len(names) > 1:
+            print(f"  ⚠ 내용이 똑같은 파일: {', '.join(names)} (같은 그룹을 두 번 받았을 수 있음)")
+
+    print("\n== 그룹별 요약 ==")
+    for group, g in merged.groupby("group", sort=False):
+        status = g["status"].fillna("?").value_counts().to_dict()
+        print(f"  {group}: 키워드 {len(g)}개 {status}")
+
+    out = ROOT / "data" / "keywords_backup.csv"
+    out.parent.mkdir(exist_ok=True)
+    merged.to_csv(out, index=False, encoding="utf-8-sig")
+    print(f"\n총 {len(merged)}개 → {out} (엑셀로 열 수 있음)")
+    if (merged["group"] == merged["source_file"].str.rsplit(".", n=1).str[0]).all():
+        print("※ 파일 안에 그룹명이 없어서 파일 이름을 그룹명으로 썼습니다. 파일 이름을 그룹명으로 바꿔두세요.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "setup", "check", "adjust"])
+    ap.add_argument("command", choices=["login", "setup", "check", "adjust", "backup"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
     ap.add_argument("--ads", default="config/ads.yaml")
     ap.add_argument("--rules", default="config/rules.yaml")
+    ap.add_argument("--folder", default="backup", help="backup: 키워드 엑셀 파일들이 있는 폴더")
     args = ap.parse_args()
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "setup": cmd_setup,
-     "check": cmd_check, "adjust": cmd_adjust}[args.command](sel, args)
+     "check": cmd_check, "adjust": cmd_adjust, "backup": cmd_backup}[args.command](sel, args)
 
 
 if __name__ == "__main__":
