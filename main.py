@@ -6,6 +6,7 @@
   python main.py setup --apply      #   → 실제 반영 + 반영됐는지 다시 읽어서 확인
   python main.py check              # keywords.csv 와 실제가 같은지 확인 + 캠페인 성과 읽기
   python main.py adjust             # 성과 규칙(rules.yaml)대로 입찰가 조정안 (기본: 미리보기만)
+  python main.py off / on           # 모든 캠페인 광고 끄기 / 켜기 (주말 OFF 용)
   python main.py backup --folder 폴더  # 옛 광고센터에서 받은 키워드 엑셀들을 하나로 합쳐 백업
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
@@ -209,6 +210,23 @@ def cmd_adjust(sel, args):
         print(f"\n{path.name} 도 새 입찰가로 갱신했습니다.")
 
 
+def cmd_on(sel, args):
+    _switch(sel, args, True)
+
+
+def cmd_off(sel, args):
+    _switch(sel, args, False)
+
+
+def _switch(sel, args, on: bool):
+    word = "켜기(ON)" if on else "끄기(OFF)"
+    with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
+        result = gmarket.set_campaigns(page, sel, on)
+    for name, ok in result:
+        print(f"  {'✓' if ok else '✗'} {name}: 광고 {word} {'완료' if ok else '실패 - 광고센터에서 직접 확인하세요'}")
+    log_change("on" if on else "off", "전체 캠페인", "", word, "수동/예약 실행")
+
+
 def cmd_backup(sel, args):
     from pathlib import Path
 
@@ -270,7 +288,7 @@ def cmd_inspect(sel, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "backup", "inspect"])
+    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
@@ -282,7 +300,7 @@ def main():
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "pull": cmd_pull, "setup": cmd_setup, "check": cmd_check,
-     "adjust": cmd_adjust, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
+     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":

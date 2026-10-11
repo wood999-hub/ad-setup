@@ -17,9 +17,19 @@ for (const p of g.products) for (const [kw, rec, bid] of p.keywords) {
   const [i, c, v, r] = FAKE_PERF[kw] || [0, 0, 0, 0]; imp += i; clk += c; conv += v; rev += r; cost += c * bid;
 }
 document.getElementById("rows").innerHTML = `<tr class="table-row" data-campaign-group-id="110004379735">
-  <td>체크박스</td><td><input type="checkbox" class="form__toggle" checked></td>
+  <td>체크박스</td><td><input type="checkbox" class="form__toggle" ${localStorage.getItem("mockOn") === "0" ? "" : "checked"}></td>
   <td><div class="table-data__inner"><button class="button__name">chm87929_직접운영캠페인_20261011-OTOF</button></div></td>
   <td>운영중</td><td>직접 운영형</td><td>${won(imp)}</td><td>${won(clk)}</td><td>${imp ? (clk / imp * 100).toFixed(1) : 0}%</td>
   <td>${clk ? won(Math.round(cost / clk)) : 0}</td><td>${conv}</td><td>${clk ? (conv / clk * 100).toFixed(1) : 0}%</td>
   <td>${won(rev)}</td><td>${won(cost)}</td><td>${cost ? Math.round(rev / cost * 100) : 0}%</td></tr>`;
-</script></body></html>
+const tg = document.querySelector(".form__toggle");
+tg.onclick = e => {
+  e.preventDefault();                       // 실제 센터처럼 확인창을 거친 뒤 바뀜
+  const next = !tg.checked === false;       // preventDefault 로 상태가 되돌려지므로 반대로 계산
+  confirmLayer.hidden = false;
+  cYes.onclick = () => { confirmLayer.hidden = true; localStorage.setItem("mockOn", next ? "1" : "0"); tg.checked = next; };
+};
+</script>
+<div id="confirmLayer" hidden><div class="box__layer-wrap"><div class="box__layer"><p>광고 상태를 변경하시겠습니까?</p>
+<div class="box__button-wrap"><button class="button button--blue" id="cYes">확인</button></div></div></div></div>
+</body></html>

@@ -121,3 +121,35 @@ def read_campaigns(page: Page, sel: dict) -> list[dict]:
         cells["id"] = row.get_attribute(s["id_attr"])
         out.append(cells)
     return out
+
+
+def _confirm_if_asked(page: Page) -> None:
+    confirm = page.get_by_role("button", name="확인", exact=True)
+    try:
+        confirm.last.wait_for(state="visible", timeout=2000)
+        confirm.last.click()
+    except Exception:
+        pass
+
+
+def set_campaigns(page: Page, sel: dict, on: bool) -> list[tuple[str, bool]]:
+    """모든 캠페인을 켜거나(on=True) 끈다. 바꾼 뒤 다시 읽어 (캠페인명, 성공여부) 목록을 돌려준다."""
+    s = sel["campaign_list"]
+    page.goto(resolve(sel["urls"]["campaigns"]))
+    page.wait_for_selector(s["row"])
+    rows = page.locator(s["row"])
+    names = []
+    for i in range(rows.count()):
+        row = rows.nth(i)
+        name = dict(zip(s["columns"], _cells(row))).get("캠페인명", f"캠페인{i + 1}")
+        names.append(name)
+        toggle = row.locator(s["toggle"]).first
+        if toggle.is_checked() != on:
+            toggle.click(force=True)  # 스위치 모양으로 꾸며진 체크박스라 force
+            _confirm_if_asked(page)
+            page.wait_for_load_state("networkidle")
+    # 다시 읽어서 확인
+    page.reload()
+    page.wait_for_selector(s["row"])
+    rows = page.locator(s["row"])
+    return [(names[i], rows.nth(i).locator(s["toggle"]).first.is_checked() == on) for i in range(rows.count())]

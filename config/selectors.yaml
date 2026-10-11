@@ -12,6 +12,7 @@ urls:
 campaign_list:
   row: "div.box__result table.table tbody tr.table-row"
   id_attr: data-campaign-group-id      # 예) 110004379735
+  toggle: "input.form__toggle"         # 캠페인 ON/OFF 스위치
   columns: [체크박스, ON/OFF, 캠페인명, 상태, 캠페인 유형, 노출수, 클릭수, 클릭률, 평균클릭비용,
             판매자 전환수, 전환율, 판매자 전환금액, 광고비용, 광고 수익율]
 

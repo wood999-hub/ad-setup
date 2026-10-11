@@ -89,6 +89,8 @@ class App:
         self.pill = tk.Label(right, text="● 준비됨", bg="#25315A", fg="#7EE2A8", font=font(9, True), padx=12, pady=5)
         self.pill.pack(side="right", padx=(10, 0))
         FlatButton(right, "로그인", self.login).pack(side="right")
+        FlatButton(right, "광고 켜기", lambda: self.switch(True)).pack(side="right", padx=(0, 6))
+        FlatButton(right, "광고 끄기", lambda: self.switch(False)).pack(side="right", padx=(0, 6))
 
     def _steps(self):
         row = tk.Frame(self.root, bg=BG)
@@ -164,7 +166,8 @@ class App:
             self.pill.config(text="● 준비됨", fg="#7EE2A8")
 
     # ---------- 실행 ----------
-    NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트"}
+    NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트",
+             "on": "광고 켜기", "off": "광고 끄기"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
@@ -203,6 +206,11 @@ class App:
         except Exception:
             pass
 
+    def switch(self, on: bool):
+        word = "켤까요" if on else "끌까요"
+        if messagebox.askyesno("광고 켜기/끄기", f"모든 캠페인 광고를 지금 {word}?"):
+            self.run("on" if on else "off")
+
     def apply(self):
         if messagebox.askyesno("반영하기", "엑셀에 적은 입찰가를 실제 광고센터에 반영할까요?\n\n"
                                          "(먼저 3. 미리보기로 확인하는 것을 권장합니다)"):
@@ -219,9 +227,40 @@ class App:
             os.startfile(path)
         return True
 
+    @staticmethod
+    def find_excel() -> str | None:
+        """설치된 MS 엑셀 위치 찾기 (기본 프로그램이 한셀이어도 엑셀로 열기 위해)."""
+        try:
+            import winreg
+        except ImportError:
+            return None
+        key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\excel.exe"
+        for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                path = winreg.QueryValue(hive, key)
+                if path and Path(path.strip('"')).exists():
+                    return path.strip('"')
+            except OSError:
+                continue
+        for base in (os.environ.get("ProgramFiles", ""), os.environ.get("ProgramFiles(x86)", "")):
+            for ver in ("root\\Office16", "root\\Office15", "Office16", "Office15"):
+                p = Path(base) / "Microsoft Office" / ver / "EXCEL.EXE"
+                if p.exists():
+                    return str(p)
+        return None
+
     def open_csv(self):
-        if self._open(ROOT / "config" / "keywords.csv", "아직 파일이 없습니다. 1. 가져오기를 먼저 눌러 주세요."):
-            self.write("\n엑셀에서 bid 칸을 고친 뒤 저장(Ctrl+S)하고 엑셀을 닫아 주세요.\n"
+        path = ROOT / "config" / "keywords.csv"
+        if not path.exists():
+            messagebox.showinfo("광고 자동화", "아직 파일이 없습니다. 1. 가져오기를 먼저 눌러 주세요.")
+            return
+        excel = self.find_excel()
+        if excel:
+            subprocess.Popen([excel, str(path)])
+        else:
+            self.write("\n(MS 엑셀을 찾지 못해 기본 프로그램으로 엽니다)\n", "muted")
+            os.startfile(path)
+        self.write("\n엑셀에서 bid 칸을 고친 뒤 저장(Ctrl+S)하고 엑셀을 닫아 주세요.\n"
                        "저장할 때 '형식을 유지할까요?' 라고 물으면 [예] 를 누르면 됩니다.\n", "muted")
 
     def open_log(self):
