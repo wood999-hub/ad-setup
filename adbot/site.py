@@ -16,11 +16,15 @@ MOCK_STATE = ROOT / "data" / "mock_state.json"
 MOCK_HOST = "http://mock.adcenter"  # 연습용 가짜 주소 (인터넷에 나가지 않고 mock/ 폴더를 보여줌)
 
 
-def url(sel: dict, key: str) -> str:
-    u = sel["urls"][key]
+def resolve(u: str) -> str:
+    """실제 주소는 그대로, mock/ 로 시작하는 연습용 경로는 가짜 주소로 바꾼다."""
     if u.startswith(("http://", "https://")):
         return u
     return f"{MOCK_HOST}/{u}"
+
+
+def url(sel: dict, key: str) -> str:
+    return resolve(sel["urls"][key])
 
 
 def _serve_mock(route):
@@ -39,6 +43,7 @@ def open_page(headless: bool = False, mock: bool = False):
         if mock:
             context.route(f"{MOCK_HOST}/**", _serve_mock)
         page = context.new_page()
+        page.on("dialog", lambda d: d.accept())  # '수정하시겠습니까?' 같은 브라우저 확인창은 '확인'
         try:
             yield page
             state_file.parent.mkdir(exist_ok=True)
@@ -66,40 +71,6 @@ def save_login(sel: dict) -> None:
 def _num(text: str) -> int:
     digits = "".join(ch for ch in text if ch.isdigit())
     return int(digits) if digits else 0
-
-
-def read_ads(page: Page, sel: dict) -> dict[str, dict]:
-    """광고 목록 화면에서 현재 세팅값(입찰가, 일예산, ON/OFF)을 읽는다."""
-    s = sel["ad_list"]
-    page.goto(url(sel, "ad_list"))
-    page.wait_for_selector(s["row"])
-    result = {}
-    for row in page.locator(s["row"]).all():
-        ad_id = row.get_attribute(s["id_attr"])
-        cur = {"bid": _num(row.locator(s["bid"]).inner_text())}
-        # 일예산/상태 칸은 화면에 없을 수 있다 (selectors.yaml 에서 비워두면 건너뜀)
-        if s.get("budget"):
-            cur["daily_budget"] = _num(row.locator(s["budget"]).inner_text())
-        if s.get("status"):
-            cur["status"] = row.locator(s["status"]).inner_text().strip()
-        result[ad_id] = cur
-    return result
-
-
-def edit_ad(page: Page, sel: dict, ad_id: str, *, bid=None, daily_budget=None, status=None) -> None:
-    """광고 1개의 입찰가/예산/상태를 수정하고 저장한다."""
-    s = sel["edit"]
-    page.goto(url(sel, "ad_list"))
-    row = page.locator(f'{sel["ad_list"]["row"]}[{sel["ad_list"]["id_attr"]}="{ad_id}"]')
-    row.locator(s["open"]).click()
-    if bid is not None:
-        page.fill(s["bid_input"], str(bid))
-    if daily_budget is not None:
-        page.fill(s["budget_input"], str(daily_budget))
-    if status is not None:
-        page.select_option(s["status_select"], status)
-    page.click(s["save"])
-    page.wait_for_selector(s["saved_signal"])
 
 
 def read_report(page: Page, sel: dict) -> list[Metrics]:

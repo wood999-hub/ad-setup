@@ -1,15 +1,14 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><title>연습용 광고센터 - 성과 리포트</title>
-<style>body{font-family:sans-serif;margin:24px} table{border-collapse:collapse} td,th{border:1px solid #ccc;padding:6px 10px}</style>
+<html lang="ko"><head><meta charset="utf-8"><title>키워드 리포트 (연습용)</title>
+<style>body{font-family:sans-serif;margin:24px} td,th{border:1px solid #ccc;padding:6px 10px} table{border-collapse:collapse}</style>
 </head><body>
-<h1>성과 리포트 (연습용)</h1>
-<table id="report"><thead><tr><th>광고번호</th><th>입찰가</th><th>노출</th><th>클릭</th><th>광고비</th><th>전환</th><th>매출</th></tr></thead><tbody></tbody></table>
+<h1>키워드별 성과 (연습용)</h1>
+<table id="report"><thead><tr><th>상품번호/키워드</th><th>입찰가</th><th>노출</th><th>클릭</th><th>광고비</th><th>전환</th><th>매출</th></tr></thead><tbody></tbody></table>
 <script src="store.js"></script>
 <script>
 const tb = document.querySelector("#report tbody");
-for (const a of loadAds()) {
-  const cost = a.clk * a.bid; const f = n => n.toLocaleString();
-  tb.insertAdjacentHTML("beforeend",
-    `<tr><td>${a.id}</td><td>${f(a.bid)}원</td><td>${f(a.imp)}</td><td>${f(a.clk)}</td><td>${f(cost)}원</td><td>${a.conv}</td><td>${f(a.rev)}원</td></tr>`);
+for (const p of loadGroup().products) for (const [kw, rec, bid] of p.keywords) {
+  const [i, c, v, r] = FAKE_PERF[kw] || [0, 0, 0, 0];
+  tb.insertAdjacentHTML("beforeend", `<tr><td>${p.no}/${kw}</td><td>${won(bid)}원</td><td>${won(i)}</td><td>${won(c)}</td><td>${won(c * bid)}원</td><td>${v}</td><td>${won(r)}원</td></tr>`);
 }
 </script></body></html>

@@ -1,32 +1,40 @@
-# 연습용 가짜 광고센터(mock/*.html)에 맞춘 완성 예시.
-# 실제 광고센터용 config/selectors.yaml 을 채울 때 이 형식을 따라하면 된다.
+# 연습용 가짜 광고센터(mock/*.html). 화면 요소 위치는 실제 config/selectors.yaml 과 같다.
+# (실제 화면 구조를 그대로 흉내냈기 때문에 같은 selector 로 동작)
+# 모두 `python main.py inspect` 결과로 확인한 값 (2026-10-11).
+# 화면이 개편되면 inspect 를 다시 돌려 이 파일만 고치면 된다.
 urls:
-  login: mock/ads.html
-  ad_list: mock/ads.html
+  login: mock/management.html
+  campaigns: mock/management.html
+  # {..} 칸은 config/groups.yaml 의 값으로 채워진다
+  group_edit: "mock/group_edit.html?campaignGroupId={campaign_group_id}&campaignId={campaign_id}&campaignGroupType={campaign_group_type}"
   report: mock/report.html
 
-ad_list:
-  row: "#adList tbody tr"
-  id_attr: data-ad-id
-  bid: td.bid
-  budget: td.budget
-  status: td.status
+# 광고 관리 → 캠페인 목록
+campaign_list:
+  row: "div.box__result table.table tbody tr.table-row"
+  id_attr: data-campaign-group-id      # 예) 110004379735
+  columns: [체크박스, ON/OFF, 캠페인명, 상태, 캠페인 유형, 노출수, 클릭수, 클릭률, 평균클릭비용,
+            판매자 전환수, 전환율, 판매자 전환금액, 광고비용, 광고 수익율]
 
-edit:
-  open: button.edit
-  bid_input: "#bidInput"
-  budget_input: "#budgetInput"
-  status_select: "#statusSelect"
-  save: "#saveBtn"
-  saved_signal: "#toast.show"
+# 광고 그룹 수정 화면: 그룹 → 상품(줄) → 상품별 키워드(팝업)
+group_edit:
+  product_row: "div.box__table-wrap > div.box__table > table.table > tbody > tr.table-row"
+  product_no_col: 1          # 줄의 몇 번째 칸(0부터)이 상품번호인지
+  product_name_col: 2
+  open_keywords: "button.button__text.text__primary"   # 상품 줄 안의 '400-1,350' 버튼 → 키워드 팝업
+  layer: "div.box__layer-wrap div.box__layer"           # 키워드 팝업
+  kw_row: "div.box__select-content > div.box__table > table.table > tbody > tr.table-row"
+  kw_name_col: 0
+  kw_recommend_col: 1        # 추천 입찰가
+  kw_bid_input: "input"      # 키워드 줄 안의 입찰가 입력칸
+  layer_apply: "div.box__layer-wrap div.box__button-wrap > button.button--blue"     # '적용하기'
+  layer_cancel: "div.box__layer-wrap div.box__button-wrap > button.button--xxlarge" # '취소'
+  save: "main.main > div.box__button-wrap > button.button--blue"                    # '수정하기'
+  cancel: "main.main > div.box__button-wrap > button.button--xlarge"                # '취소'
+  # 수정하기 뒤에 확인 팝업이 뜨면 누를 버튼 (안 뜨면 그냥 넘어감)
+  save_confirm: "div.box__layer-wrap div.box__button-wrap > button.button--blue"
 
+# 키워드별 성과 리포트 - 아직 조사 전 (adjust 는 이 정보가 있어야 실제 광고에서 동작)
 report:
   row: "#report tbody tr"
-  columns:
-    ad_id: 0
-    bid: 1
-    impressions: 2
-    clicks: 3
-    cost: 4
-    conversions: 5
-    revenue: 6
+  columns: {ad_id: 0, bid: 1, impressions: 2, clicks: 3, cost: 4, conversions: 5, revenue: 6}

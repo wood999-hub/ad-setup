@@ -1,21 +1,25 @@
-"""광고 자동 세팅 → 체크 → 수정 프로그램.
+"""광고 자동 세팅 → 체크 → 수정 프로그램 (새 G마켓 광고센터, 파워클릭 → 직접 운영형).
 
-  python main.py login              # 1회: 직접 로그인해서 세션 저장
-  python main.py setup              # ads.yaml 대로 세팅 (기본: 미리보기만)
-  python main.py check              # 성과 수집 + 세팅값이 ads.yaml 과 같은지 확인
-  python main.py adjust             # 규칙대로 입찰가 조정안 출력 (기본: 미리보기만)
-  python main.py adjust --apply     # 조정안을 실제로 반영
-  python main.py backup --folder 폴더  # 다운받은 키워드 엑셀들을 하나로 합쳐 백업
-  python main.py inspect            # 화면 구조 조사 (selectors.yaml 채우기용)
+  python main.py inspect            # 화면 구조 조사 + 로그인 세션 저장 (처음 1회)
+  python main.py pull               # 지금 광고센터의 키워드 입찰가를 config/keywords.csv 로 가져옴
+  python main.py setup              # keywords.csv 대로 입찰가 세팅 (기본: 미리보기만)
+  python main.py setup --apply      #   → 실제 반영 + 반영됐는지 다시 읽어서 확인
+  python main.py check              # keywords.csv 와 실제가 같은지 확인 + 캠페인 성과 읽기
+  python main.py adjust             # 성과 규칙(rules.yaml)대로 입찰가 조정안 (기본: 미리보기만)
+  python main.py backup --folder 폴더  # 옛 광고센터에서 받은 키워드 엑셀들을 하나로 합쳐 백업
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
 """
 import argparse
 import csv
+import shutil
 from datetime import datetime
+from pathlib import Path
 
-from adbot import rules, site
+from adbot import gmarket, rules, site
 from adbot.config import ROOT, load
+
+FIELDS = ["group", "product_no", "product_name", "keyword", "recommended_bid", "bid"]
 
 
 def log_change(kind: str, ad_id: str, before, after, reason: str) -> None:
@@ -29,100 +33,175 @@ def log_change(kind: str, ad_id: str, before, after, reason: str) -> None:
         w.writerow([datetime.now().isoformat(timespec="seconds"), kind, ad_id, before, after, reason])
 
 
-def sync_ads_yaml(path: str, ad_id: str, key: str, value) -> None:
-    """자동 조정 결과를 ads.yaml 에도 반영해서 '정답 파일'과 실제 세팅을 일치시킨다. (주석 유지)"""
-    p = ROOT / path
-    lines = p.read_text(encoding="utf-8").splitlines(keepends=True)
-    in_block = False
-    for i, line in enumerate(lines):
-        if line.lstrip().startswith("- id:"):
-            in_block = f'"{ad_id}"' in line or line.split(":", 1)[1].strip() == ad_id
-        elif in_block and line.strip().startswith(f"{key}:"):
-            indent = line[: len(line) - len(line.lstrip())]
-            comment = line[line.index("#"):].rstrip("\n") if "#" in line else ""
-            val = f'"{value}"' if isinstance(value, str) else value
-            lines[i] = f"{indent}{key}: {val}" + (f" {comment}" if comment else "") + "\n"
-            break
-    p.write_text("".join(lines), encoding="utf-8")
+def kw_path(args) -> Path:
+    if args.keywords:
+        return ROOT / args.keywords
+    return ROOT / ("data/mock_keywords.csv" if args.site == "mock" else "config/keywords.csv")
+
+
+def read_csv(path: Path) -> list[dict]:
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        r["bid"] = int(str(r["bid"]).replace(",", "").strip() or 0)
+    return rows
+
+
+def write_csv(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:  # utf-8-sig: 엑셀에서 한글 안 깨짐
+        w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def key(r: dict) -> tuple:
+    return (r["product_no"], r["keyword"])
+
+
+def bid_problem(bid: int, r: dict) -> str | None:
+    if not r["bid_min"] <= bid <= r["bid_max"]:
+        return f"입찰가 {bid}원이 허용 범위({r['bid_min']}~{r['bid_max']}원) 밖"
+    if bid % r["bid_unit"]:
+        return f"입찰가 {bid}원이 {r['bid_unit']}원 단위가 아님"
+    return None
+
+
+def apply_and_verify(page, sel, group: dict, changes: dict, before: dict, kind: str, reasons: dict | None = None) -> bool:
+    """입찰가 반영 → 화면을 다시 읽어 정말 바뀌었는지 확인."""
+    done = gmarket.set_bids(page, sel, group, changes)
+    after = {key(x): x["bid"] for x in gmarket.read_group(page, sel, group)}
+    ok = True
+    for (p, kw), bid in changes.items():
+        if after.get((p, kw)) == bid:
+            print(f"  ✓ {kw}: {before.get((p, kw))}→{bid}원 반영 확인")
+            log_change(kind, f"{group['name']}/{p}/{kw}", before.get((p, kw)), bid, (reasons or {}).get((p, kw), "keywords.csv 반영"))
+        else:
+            ok = False
+            print(f"  ✗ {kw}: {bid}원으로 바꾸려 했지만 지금 {after.get((p, kw))}원 (입력 {len(done)}건)")
+    return ok
+
+
+def cmd_pull(sel, args):
+    path = kw_path(args)
+    groups = load(args.groups)["groups"]
+    with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
+        rows = [r for g in groups for r in gmarket.read_group(page, sel, g)]
+    if path.exists():
+        bak = ROOT / "data" / f"keywords_before_pull_{datetime.now():%Y%m%d_%H%M%S}.csv"
+        bak.parent.mkdir(exist_ok=True)
+        shutil.copy(path, bak)
+        print(f"(기존 파일은 {bak} 로 백업)")
+    write_csv(path, rows)
+    for g in groups:
+        mine = [r for r in rows if r["group"] == g["name"]]
+        print(f"[{g['name']}] 키워드 {len(mine)}개")
+        for r in mine:
+            print(f"  {r['product_no']} {r['keyword']}: {r['bid']:,}원 (추천 {r['recommended_bid']:,}원)")
+    print(f"\n저장: {path}\n→ 엑셀로 열어 bid 칸을 고친 뒤 'setup' 으로 미리보기, 'setup --apply' 로 반영")
 
 
 def cmd_setup(sel, args):
-    wanted = load(args.ads)["ads"]
+    path, r = kw_path(args), load(args.rules)
+    if not path.exists():
+        print(f"{path} 가 없습니다. 먼저 'pull' 을 실행하세요.")
+        return
+    desired = read_csv(path)
+    groups = load(args.groups)["groups"]
+    total = 0
     with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
-        current = site.read_ads(page, sel)
-        for ad in wanted:
-            cur = current.get(ad["id"])
-            if cur is None:
-                print(f"[없음] {ad['id']} {ad.get('name', '')} - 광고센터에서 먼저 상품을 등록하세요")
+        for g in groups:
+            want = {key(x): x["bid"] for x in desired if x["group"] == g["name"]}
+            live = {key(x): x["bid"] for x in gmarket.read_group(page, sel, g)}
+            changes = {}
+            print(f"[{g['name']}]")
+            for k, bid in want.items():
+                if k not in live:
+                    print(f"  [없음] {k[1]} - 광고센터에 이 키워드가 없음 (추가는 아직 미지원)")
+                elif (problem := bid_problem(bid, r)):
+                    print(f"  [오류] {k[1]}: {problem} → 건너뜀")
+                elif bid != live[k]:
+                    changes[k] = bid
+                    print(f"  [변경] {k[1]}: {live[k]:,} → {bid:,}원")
+            print(f"  변경 {len(changes)}건, 같음 {len(want) - len(changes)}건")
+            total += len(changes)
+            if not (args.apply and changes):
                 continue
-            diff = {k: ad[k] for k in ("bid", "daily_budget", "status") if k in ad and k in cur and ad[k] != cur[k]}
-            if not diff:
-                print(f"[같음] {ad['id']} 변경 없음")
+            if len(changes) > r["max_changes_per_run"]:
+                print(f"  중단: 변경 {len(changes)}건 > 1회 한도 {r['max_changes_per_run']}건 (rules.yaml)")
                 continue
-            print(f"[변경] {ad['id']} {cur} → {diff}")
-            if args.apply:
-                site.edit_ad(page, sel, ad["id"], **diff)
-                log_change("setup", ad["id"], cur, diff, "ads.yaml 반영")
-        if not args.apply:
-            print("\n(미리보기) 실제 반영하려면 --apply 를 붙이세요.")
+            apply_and_verify(page, sel, g, changes, live, "setup")
+    if total and not args.apply:
+        print("\n(미리보기) 실제 반영하려면 --apply 를 붙이세요.")
 
 
 def cmd_check(sel, args):
-    wanted = {a["id"]: a for a in load(args.ads)["ads"]}
+    path = kw_path(args)
+    desired = read_csv(path) if path.exists() else []
+    groups = load(args.groups)["groups"]
+    stamp = f"{datetime.now():%Y%m%d_%H%M}"
     with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
-        current = site.read_ads(page, sel)
-        metrics = site.read_report(page, sel)
-        shot = site.screenshot(page, f"report_{datetime.now():%Y%m%d_%H%M}")
+        live = [x for g in groups for x in gmarket.read_group(page, sel, g)]
+        campaigns = gmarket.read_campaigns(page, sel)
+        shot = site.screenshot(page, f"campaigns_{stamp}")
 
-    print("== 세팅값 검증 ==")
-    ok = True
-    for ad_id, want in wanted.items():
-        cur = current.get(ad_id)
-        bad = {k: (cur or {}).get(k) for k in ("bid", "daily_budget", "status")
-               if k in want and (cur is None or (k in cur and cur[k] != want[k]))}
-        if bad:
-            ok = False
-            print(f"  ✗ {ad_id}: 기대 {({k: want[k] for k in bad})} / 실제 {bad}")
-        else:
-            print(f"  ✓ {ad_id}")
-    print("  → 모두 일치" if ok else "  → 불일치 있음 (setup --apply 로 맞추거나 원인 확인)")
+    print("== 입찰가 검증 (keywords.csv vs 실제) ==")
+    if not desired:
+        print("  keywords.csv 가 없어 건너뜀 (pull 먼저)")
+    live_map = {key(x): x["bid"] for x in live}
+    bad = 0
+    for d in desired:
+        cur = live_map.get(key(d))
+        if cur != d["bid"]:
+            bad += 1
+            print(f"  ✗ {d['group']} / {d['keyword']}: 기대 {d['bid']:,}원, 실제 {cur if cur is None else f'{cur:,}원'}")
+    if desired:
+        print(f"  {len(desired) - bad}/{len(desired)} 일치" + ("" if bad else " ✓"))
 
-    print("\n== 성과 ==")
-    out = ROOT / "data" / f"metrics_{datetime.now():%Y%m%d_%H%M}.csv"
-    with open(out, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
-        w.writerow(["ad_id", "bid", "impressions", "clicks", "cost", "conversions", "revenue", "roas"])
-        for m in metrics:
-            w.writerow([m.ad_id, m.bid, m.impressions, m.clicks, m.cost, m.conversions, m.revenue, f"{m.roas:.0f}"])
-            print(f"  {m.ad_id}: 클릭 {m.clicks} 광고비 {m.cost:,}원 매출 {m.revenue:,}원 ROAS {m.roas:.0f}%")
-    print(f"\n저장: {out}\n화면: {shot}")
+    print("\n== 캠페인 성과 (오늘) ==")
+    for c in campaigns:
+        print(f"  {c.get('캠페인명')} [{c.get('상태')}] 노출 {c.get('노출수')} 클릭 {c.get('클릭수')} "
+              f"광고비 {c.get('광고비용')} 전환매출 {c.get('판매자 전환금액')} 수익률 {c.get('광고 수익율')}")
+    write_csv(ROOT / "data" / f"live_keywords_{stamp}.csv", live)
+    print(f"\n저장: data/live_keywords_{stamp}.csv, 화면: {shot}")
 
 
 def cmd_adjust(sel, args):
     r = load(args.rules)
+    if sel.get("report", {}).get("row", "TODO") == "TODO":
+        print("키워드별 성과 화면(리포트)이 아직 조사되지 않아 adjust 는 연습 모드(--site mock)에서만 동작합니다.")
+        return
+    path = kw_path(args)
+    desired = read_csv(path)
+    by_key = {f"{x['product_no']}/{x['keyword']}": x for x in desired}
+    groups = {g["name"]: g for g in load(args.groups)["groups"]}
     with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
         decisions = rules.plan(site.read_report(page, sel), r)
-        changes = [d for d in decisions if d.action != "hold"]
+        plan = {}
         for d in decisions:
-            arrow = f"{d.old_bid}→{d.new_bid}원" if d.action in ("raise", "lower") else ""
+            if d.action == "pause":  # 새 센터는 키워드 ON/OFF 가 없어 최저 입찰가로 낮춤
+                d.new_bid, d.reason = r["bid_min"], d.reason + " → 최저 입찰가로"
+            arrow = f"{d.old_bid}→{d.new_bid}원" if d.new_bid != d.old_bid else ""
             print(f"  [{d.action:5}] {d.ad_id} {arrow} {d.reason}")
-
-        if len(changes) > r["max_changes_per_run"]:
-            print(f"\n중단: 변경 {len(changes)}건 > 1회 한도 {r['max_changes_per_run']}건. 규칙/데이터를 확인하세요.")
+            if d.new_bid != d.old_bid and d.ad_id in by_key:
+                plan[d.ad_id] = d
+        if len(plan) > r["max_changes_per_run"]:
+            print(f"\n중단: 변경 {len(plan)}건 > 1회 한도 {r['max_changes_per_run']}건.")
             return
         if not args.apply:
             print("\n(미리보기) 실제 반영하려면 --apply 를 붙이세요.")
             return
-        for d in changes:
-            if d.action == "pause":
-                site.edit_ad(page, sel, d.ad_id, status="OFF")
-                sync_ads_yaml(args.ads, d.ad_id, "status", "OFF")
-                log_change("adjust", d.ad_id, "ON", "OFF", d.reason)
-            else:
-                site.edit_ad(page, sel, d.ad_id, bid=d.new_bid)
-                sync_ads_yaml(args.ads, d.ad_id, "bid", d.new_bid)
-                log_change("adjust", d.ad_id, d.old_bid, d.new_bid, d.reason)
-        print(f"\n{len(changes)}건 반영 완료 → data/changes.csv 기록, {args.ads} 갱신")
+        for name, g in groups.items():
+            mine = {key(by_key[a]): d.new_bid for a, d in plan.items() if by_key[a]["group"] == name}
+            if not mine:
+                continue
+            before = {key(by_key[a]): d.old_bid for a, d in plan.items() if by_key[a]["group"] == name}
+            reasons = {key(by_key[a]): d.reason for a, d in plan.items() if by_key[a]["group"] == name}
+            if apply_and_verify(page, sel, g, mine, before, "adjust", reasons):
+                for a, d in plan.items():
+                    by_key[a]["bid"] = d.new_bid
+        write_csv(path, desired)
+        print(f"\n{path.name} 도 새 입찰가로 갱신했습니다.")
 
 
 def cmd_backup(sel, args):
@@ -186,18 +265,19 @@ def cmd_inspect(sel, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "setup", "check", "adjust", "backup", "inspect"])
+    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
-    ap.add_argument("--ads", default="config/ads.yaml")
+    ap.add_argument("--groups", default="config/groups.yaml")
+    ap.add_argument("--keywords", help="입찰가 파일 (기본: config/keywords.csv)")
     ap.add_argument("--rules", default="config/rules.yaml")
     ap.add_argument("--folder", default="backup", help="backup: 키워드 엑셀 파일들이 있는 폴더")
     args = ap.parse_args()
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
-    {"login": lambda s, a: site.save_login(s), "setup": cmd_setup,
-     "check": cmd_check, "adjust": cmd_adjust, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
+    {"login": lambda s, a: site.save_login(s), "pull": cmd_pull, "setup": cmd_setup, "check": cmd_check,
+     "adjust": cmd_adjust, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":

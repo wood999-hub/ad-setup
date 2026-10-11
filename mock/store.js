@@ -1,13 +1,22 @@
-// 연습용 가짜 광고 데이터. 브라우저 localStorage 에 저장된다.
-const DEFAULT = [
-  { id: "A1001", name: "여름 반팔티", bid: 200, budget: 30000, status: "ON",
-    imp: 12000, clk: 240, conv: 30, rev: 900000 },
-  { id: "A1002", name: "린넨 셔츠", bid: 250, budget: 20000, status: "ON",
-    imp: 8000, clk: 120, conv: 2, rev: 40000 },
-  { id: "A1003", name: "슬리퍼", bid: 150, budget: 10000, status: "ON",
-    imp: 3000, clk: 8, conv: 0, rev: 0 },
-];
-function loadAds() {
-  try { return JSON.parse(localStorage.getItem("mockAds")) || DEFAULT; } catch (e) { return DEFAULT; }
+// 연습용 가짜 광고센터 데이터 (브라우저 localStorage 에 저장). 실제 G마켓 광고센터 구조를 흉내냄.
+const DEFAULT_GROUP = {
+  name: "MK관리 REV.3 추가-FJUX",
+  budget: 20000,
+  products: [
+    { no: "2168720238", name: "조명만들기 키트 /단품구성", keywords: [
+      ["키트", 430, 400], ["미술놀이", 820, 800], ["색칠공부", 900, 1000], ["과학키트", 1200, 1350],
+      ["겨울만들기", 900, 950], ["만들기자랑", 600, 650], ["조명만들기", 480, 500], ["유아장난감", 760, 800], ["공예", 610, 650],
+    ]},
+  ],
+};
+// 키워드별 가짜 성과 [노출, 클릭, 전환, 매출] - 규칙 엔진 연습용
+const FAKE_PERF = {
+  "키트": [5000, 120, 6, 180000], "미술놀이": [3000, 60, 0, 0], "과학키트": [2000, 45, 1, 20000],
+  "색칠공부": [800, 10, 0, 0], "겨울만들기": [4000, 80, 4, 300000],
+};
+function loadGroup() {
+  try { return JSON.parse(localStorage.getItem("mockGroup")) || structuredClone(DEFAULT_GROUP); }
+  catch (e) { return structuredClone(DEFAULT_GROUP); }
 }
-function saveAds(ads) { localStorage.setItem("mockAds", JSON.stringify(ads)); }
+function saveGroup(g) { localStorage.setItem("mockGroup", JSON.stringify(g)); }
+const won = n => Number(n).toLocaleString();
