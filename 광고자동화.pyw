@@ -132,7 +132,7 @@ class App:
     def _footer(self):
         foot = tk.Frame(self.root, bg=BG)
         foot.pack(side="bottom", fill="x", padx=24, pady=(0, 12))
-        for text, cmd in [("사용설명서", self.open_manual), ("변경 기록", self.open_log),
+        for text, cmd in [("사용설명서", self.open_manual), ("변경 기록", self.open_log), ("화면 조사", self.inspect),
                           ("프로그램 업데이트", self.update)]:
             FlatButton(foot, text, cmd, small=True).pack(side="left", padx=(0, 6))
         tk.Label(foot, text="반영 전에는 항상 미리보기로 확인하세요", bg=BG, fg=MUTED, font=font(9)).pack(side="right")
@@ -167,7 +167,7 @@ class App:
 
     # ---------- 실행 ----------
     NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트",
-             "on": "광고 켜기", "off": "광고 끄기"}
+             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
@@ -175,7 +175,7 @@ class App:
             return
         if cmd is None:
             cmd = [PY, "main.py", *args]
-            if args[0] != "login":
+            if args[0] not in ("login", "inspect"):
                 cmd.append("--headless")  # 브라우저 창 없이 조용히 실행
         name = "반영" if "--apply" in args else self.NAMES.get(args[0] if args else cmd[0], "실행")
         self.set_busy(True, name)
@@ -205,6 +205,31 @@ class App:
             self.proc.stdin.flush()
         except Exception:
             pass
+
+    def inspect(self):
+        """광고센터 화면 구조 조사: 브라우저에서 화면을 띄우고 [이 화면 조사] 를 누른다."""
+        self.run("inspect")
+        win = tk.Toplevel(self.root, bg=CARD, padx=20, pady=16)
+        win.title("화면 조사")
+        win.attributes("-topmost", True)
+        tk.Label(win, text="새로 뜬 브라우저에서 조사할 화면을 연 뒤\n아래 [이 화면 조사] 를 누르세요.",
+                 bg=CARD, fg=TEXT, font=font(10), justify="left").pack(anchor="w", pady=(0, 12))
+
+        def send(text):
+            try:
+                self.proc.stdin.write(text)
+                self.proc.stdin.flush()
+            except Exception:
+                pass
+
+        def finish():
+            send("q\n")
+            win.destroy()
+            self.write("\n조사 결과는 data\\inspect 폴더에도 저장됐습니다. 진행 상황 내용을 복사해서 Claude 에게 보내주세요.\n", "muted")
+
+        FlatButton(win, "이 화면 조사", lambda: send("\n"), primary=True).pack(fill="x")
+        FlatButton(win, "끝내기", finish).pack(fill="x", pady=(8, 0))
+        win.protocol("WM_DELETE_WINDOW", finish)
 
     def switch(self, on: bool):
         word = "켤까요" if on else "끌까요"
