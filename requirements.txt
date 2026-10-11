@@ -1,0 +1,7 @@
+playwright>=1.47
+pyyaml>=6.0
+pytest>=8.0
+pandas>=2.0
+xlrd>=2.0      # .xls(97-2003) 읽기
+openpyxl>=3.1  # .xlsx 읽기
+lxml>=5.0      # HTML 형식 엑셀 읽기

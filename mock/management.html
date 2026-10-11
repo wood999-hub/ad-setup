@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>G마켓광고센터 (연습용)</title>
+<style>body{font-family:sans-serif;margin:24px} td,th{border:1px solid #ccc;padding:6px 10px} table{border-collapse:collapse}</style>
+</head><body>
+<main class="main">
+  <h1>광고 관리 (연습용)</h1>
+  <div class="box__top-side"><button class="button button--medium">운영현황 다운로드</button></div>
+  <div class="box__result module-exp-spm-c"><div class="box__table-wrap"><div class="box__table is-scroll">
+    <table class="table"><thead><tr><th>전체 선택 체크박스</th><th>ON/OFF</th><th>캠페인명</th><th>상태</th><th>캠페인 유형</th><th>노출수</th><th>클릭수</th><th>클릭률</th><th>평균클릭비용</th><th>판매자 전환수</th><th>전환율</th><th>판매자 전환금액</th><th>광고비용</th><th>광고 수익율</th></tr></thead>
+    <tbody id="rows"></tbody></table>
+  </div></div></div>
+</main>
+<script src="store.js"></script>
+<script>
+const g = loadGroup(); let imp = 0, clk = 0, conv = 0, rev = 0, cost = 0;
+for (const p of g.products) for (const [kw, rec, bid] of p.keywords) {
+  const [i, c, v, r] = FAKE_PERF[kw] || [0, 0, 0, 0]; imp += i; clk += c; conv += v; rev += r; cost += c * bid;
+}
+document.getElementById("rows").innerHTML = `<tr class="table-row" data-campaign-group-id="110004379735">
+  <td>체크박스</td><td><input type="checkbox" class="form__toggle" ${localStorage.getItem("mockOn") === "0" ? "" : "checked"}></td>
+  <td><div class="table-data__inner"><button class="button__name">chm87929_직접운영캠페인_20261011-OTOF</button></div></td>
+  <td>운영중</td><td>직접 운영형</td><td>${won(imp)}</td><td>${won(clk)}</td><td>${imp ? (clk / imp * 100).toFixed(1) : 0}%</td>
+  <td>${clk ? won(Math.round(cost / clk)) : 0}</td><td>${conv}</td><td>${clk ? (conv / clk * 100).toFixed(1) : 0}%</td>
+  <td>${won(rev)}</td><td>${won(cost)}</td><td>${cost ? Math.round(rev / cost * 100) : 0}%</td></tr>`;
+const tg = document.querySelector(".form__toggle");
+tg.onclick = e => {
+  e.preventDefault();                       // 실제 센터처럼 확인창을 거친 뒤 바뀜
+  const next = !tg.checked === false;       // preventDefault 로 상태가 되돌려지므로 반대로 계산
+  confirmLayer.hidden = false;
+  cYes.onclick = () => { confirmLayer.hidden = true; localStorage.setItem("mockOn", next ? "1" : "0"); tg.checked = next; };
+};
+</script>
+<div id="confirmLayer" hidden><div class="box__layer-wrap"><div class="box__layer"><p>광고 상태를 변경하시겠습니까?</p>
+<div class="box__button-wrap"><button class="button button--blue" id="cYes">확인</button></div></div></div></div>
+</body></html>

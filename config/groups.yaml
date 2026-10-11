@@ -1,0 +1,8 @@
+# 자동으로 관리할 광고 그룹.
+# 값은 광고 관리 → 캠페인 → 그룹을 열었을 때 주소창에 나오는 숫자.
+#   .../group/edit?campaignGroupId=110004379735&campaignId=100100026712020&campaignGroupType=111020
+groups:
+  - name: MK관리 REV.3 추가
+    campaign_group_id: "110004379735"
+    campaign_id: "100100026712020"
+    campaign_group_type: "111020"

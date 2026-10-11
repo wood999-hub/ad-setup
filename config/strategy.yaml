@@ -1,0 +1,30 @@
+# 리포트 성과 기반 조정 규칙 (AI Product Ads · 직접 운영형)
+# 순위 입찰이 없으므로 '최대입찰가(상한)'와 '일예산'만 조정한다.
+
+basis: product            # ROAS 기준: product = 광고 상품 기준 전환 / seller = 판매자 기준 전환
+target_roas: 300          # 목표 ROAS(%) = 전환금액 / 광고비용 × 100
+cost_vat: included        # 리포트 광고비용은 VAT 포함. included = 그대로 / excluded = 1.1 로 나눠서 계산
+
+# 판단 대상 기간
+exclude_recent_days: 7    # 전환이 클릭 후 15일까지 잡히므로 최근 N일 데이터는 판단에서 제외
+min_clicks: 30            # 클릭이 이보다 적으면 조정하지 않음 (표본 부족)
+
+# 입찰가(키워드·상품 최대입찰가) 규칙
+lower_below_ratio: 0.8    # ROAS < 목표×0.8 → 내림
+raise_above_ratio: 1.2    # ROAS > 목표×1.2 이고 노출이 적으면 → 올림
+low_impressions: 1000     # '노출이 적다' 기준 (판단 기간 합계)
+step_down_pct: 10
+step_up_pct: 10
+max_step_pct: 20          # 1회 조정 폭 상한 (AI 학습 안정성)
+zero_conv_cost: 30000     # 전환 0인데 광고비가 이 이상 → 삭제/OFF '후보' 로 표시만 (자동 삭제 안 함)
+
+# 일예산(광고그룹) 규칙
+budget_burn_ratio: 0.9    # 일예산 소진율이 이 이상이고 ROAS ≥ 목표 → 일예산 올림
+budget_step_pct: 10
+
+# 허용 범위 (광고센터 엑셀등록 기준)
+bid_min: 90
+bid_max: 200000
+bid_unit: 10
+budget_min: 10000
+budget_max: 10000000
