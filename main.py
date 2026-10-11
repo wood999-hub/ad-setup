@@ -242,6 +242,18 @@ def cmd_plan(sel, args):
         print(f"⚠ 리포트에서 못 찾은 칸: {missing} → config/report_columns.yaml 확인 필요")
     level = args.level
     perfs, note = report.to_perfs(df, level, s["exclude_recent_days"])
+    # 리포트에는 현재 입찰가가 없으므로 keywords.csv(가져오기 결과)에서 채운다
+    path = kw_path(args)
+    if level == "keyword" and path.exists():
+        bids = {(r["product_no"], r["keyword"]): r["bid"] for r in read_csv(path)}
+        missing_bid = 0
+        for p in perfs:
+            if not p.bid:
+                p.bid = bids.get((p.key.get("product_no", ""), p.key.get("keyword", "")), 0)
+                missing_bid += not p.bid
+        if missing_bid:
+            print(f"⚠ 현재 입찰가를 모르는 키워드 {missing_bid}개 → 먼저 [1. 가져오기] 를 누르세요 (조정 대상에서 빠짐)")
+        perfs = [p for p in perfs if p.bid]
     changes = strategy.plan(perfs, s)
     print(f"[{level}] {len(perfs)}개 · {note} · 기준 {'광고 상품' if s['basis'] == 'product' else '판매자'} ROAS, 목표 {s['target_roas']}%")
     names = {"raise": "올림", "lower": "내림", "candidate_off": "삭제/OFF 후보", "budget_up": "예산 올림", "hold": "유지"}
@@ -257,6 +269,8 @@ def cmd_plan(sel, args):
     n = sum(c.action != "hold" for c in changes)
     print(f"\n변경 {n}건 / 유지 {len(changes) - n}건 → 검토용: {out}")
     print("※ 업로드용 엑셀은 광고센터 엑셀등록 템플릿을 받은 뒤 만들 수 있습니다.")
+    if args.open and hasattr(__import__("os"), "startfile"):
+        __import__("os").startfile(out)  # 프로그램 창에서 실행하면 조정안을 바로 연다
 
 
 def cmd_backup(sel, args):
@@ -329,6 +343,7 @@ def main():
     ap.add_argument("--rules", default="config/rules.yaml")
     ap.add_argument("--folder", default="backup", help="backup: 키워드 엑셀 파일들이 있는 폴더")
     ap.add_argument("--report", help="plan: 광고센터에서 받은 리포트 엑셀 파일")
+    ap.add_argument("--open", action="store_true", help="plan: 만든 조정안 엑셀을 바로 열기")
     ap.add_argument("--level", default="keyword", choices=["keyword", "product", "group"], help="plan: 판단 단위")
     args = ap.parse_args()
 

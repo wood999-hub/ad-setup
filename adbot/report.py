@@ -32,8 +32,11 @@ def read(path: Path, cols: dict) -> pd.DataFrame:
 def to_perfs(df: pd.DataFrame, level: str, exclude_recent_days: int, today: date | None = None) -> tuple[list[Perf], str]:
     """level 별로 묶어 합계. 반환: (성과 목록, 기간 설명)."""
     note = "날짜 칸 없음 → 리포트 전체 기간 사용 (최근 7일 제외하려면 기간을 그렇게 받아 주세요)"
-    if df["date"].notna().any():
-        d = pd.to_datetime(df["date"].astype(str).str[:10], errors="coerce")
+    dates = df["date"].dropna().astype(str)
+    if len(dates) and dates.str.contains("~").any():
+        note = "합계 리포트(기간 묶음) → 최근 7일을 뺄 수 없음. 보기 방식 '날짜별' 로 받는 것을 권장"
+    elif len(dates):
+        d = pd.to_datetime(df["date"].astype(str).str[:10].str.replace(".", "-", regex=False), errors="coerce")
         cutoff = pd.Timestamp((today or date.today()) - timedelta(days=exclude_recent_days))
         df = df[d < cutoff]
         note = f"{cutoff.date()} 이전 데이터만 사용 (최근 {exclude_recent_days}일 제외)"

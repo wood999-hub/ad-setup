@@ -132,7 +132,7 @@ class App:
     def _footer(self):
         foot = tk.Frame(self.root, bg=BG)
         foot.pack(side="bottom", fill="x", padx=24, pady=(0, 12))
-        for text, cmd in [("사용설명서", self.open_manual), ("변경 기록", self.open_log), ("화면 조사", self.inspect),
+        for text, cmd in [("리포트 분석", self.analyze), ("사용설명서", self.open_manual), ("변경 기록", self.open_log), ("화면 조사", self.inspect),
                           ("프로그램 업데이트", self.update)]:
             FlatButton(foot, text, cmd, small=True).pack(side="left", padx=(0, 6))
         tk.Label(foot, text="반영 전에는 항상 미리보기로 확인하세요", bg=BG, fg=MUTED, font=font(9)).pack(side="right")
@@ -167,7 +167,7 @@ class App:
 
     # ---------- 실행 ----------
     NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트",
-             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사"}
+             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사", "plan": "리포트 분석"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
@@ -230,6 +230,15 @@ class App:
         FlatButton(win, "이 화면 조사", lambda: send("\n"), primary=True).pack(fill="x")
         FlatButton(win, "끝내기", finish).pack(fill="x", pady=(8, 0))
         win.protocol("WM_DELETE_WINDOW", finish)
+
+    def analyze(self):
+        """광고센터에서 받은 리포트 엑셀 → 조정안(검토용 엑셀)."""
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            title="리포트 엑셀 선택 (리포트 → 키워드별 · 날짜별 → 엑셀 다운로드)",
+            initialdir=str(Path.home() / "Downloads"), filetypes=[("엑셀", "*.xlsx *.xls *.csv"), ("모든 파일", "*.*")])
+        if path:
+            self.run("plan", "--report", path, "--open")
 
     def switch(self, on: bool):
         word = "켤까요" if on else "끌까요"
