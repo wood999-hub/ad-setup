@@ -16,7 +16,9 @@ JS = r"""
   const vis = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const txt = el => (el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.title || '').trim().replace(/\s+/g, ' ').slice(0, 40);
   const sel = el => {
-    if (el.id && !/^\d/.test(el.id)) return '#' + CSS.escape(el.id);
+    // React 가 매번 새로 만드는 id(_r_d_, :r1: 등)는 다음 접속 때 바뀌므로 쓰지 않는다
+    const stableId = id => id && !/^\d/.test(id) && !/^(_r_|:r)/.test(id);
+    if (stableId(el.id)) return '#' + CSS.escape(el.id);
     for (const a of ['data-testid', 'data-test', 'name']) {
       const v = el.getAttribute(a); if (v) return `${el.tagName.toLowerCase()}[${a}="${v}"]`;
     }
@@ -24,7 +26,7 @@ JS = r"""
     let cur = el;
     for (let depth = 0; cur && cur.nodeType === 1 && depth < 4; depth++, cur = cur.parentElement) {
       let s = cur.tagName.toLowerCase();
-      if (cur.id && !/^\d/.test(cur.id)) { parts.unshift('#' + CSS.escape(cur.id)); break; }
+      if (stableId(cur.id)) { parts.unshift('#' + CSS.escape(cur.id)); break; }
       const cls = [...cur.classList].filter(c => !/^(css-|sc-|jsx-)|\d{3,}/.test(c)).slice(0, 2);
       if (cls.length) s += '.' + cls.map(c => CSS.escape(c)).join('.');
       parts.unshift(s);
@@ -59,7 +61,9 @@ JS = r"""
   }
   for (const i of document.querySelectorAll('input:not([type=hidden]):not([type=button]):not([type=submit]), select, textarea')) {
     if (!vis(i)) continue;
-    out.inputs.push(`${i.tagName.toLowerCase()}[${i.type || ''}] ${txt(i) || i.value || ''}  →  ${sel(i)}`);
+    const row = i.closest('tr, li, .box__row, .form__field, div[class*=row]');
+    const label = row ? (row.querySelector('th, label, .text__label, .box__head, dt') || {}).innerText || '' : '';
+    out.inputs.push(`${i.tagName.toLowerCase()}[${i.type || ''}] ${txt(i) || i.value || ''} (라벨: ${label.trim().slice(0, 20)})  →  ${sel(i)}`);
   }
   out.buttons = [...new Set(out.buttons)].slice(0, 80);
   out.inputs = out.inputs.slice(0, 60);

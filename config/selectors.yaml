@@ -18,6 +18,17 @@ campaign_list:
   download_report: "main.main > div.box__top-side > button.button"   # '운영현황 다운로드' (엑셀)
   period_tabs: "div.box__radio-tab > button.button__tab"            # 어제/오늘/1주일/이번달
 
+# 광고 그룹 수정 화면 - inspect 결과로 확인됨 (2026-10-11)
+# 주소: /ad/management/group/edit?campaignGroupId=..&campaignId=..&campaignGroupType=111020
+# 구조: 그룹 → 상품(줄) → 상품별 키워드(입찰가 범위 버튼을 누르면 열림)
+group_edit:
+  product_row: "div.box__table-wrap table.table tbody tr.table-row"
+  product_columns: [선택, 상품번호, 상품명, 키워드 수, 키워드별]
+  open_keywords: "td.table-data--right button.button__text.text__primary"   # 예) '400-1,350'
+  save: "main.main > div.box__button-wrap > button.button--blue"            # '수정하기'
+  cancel: "main.main > div.box__button-wrap > button.button--xlarge"        # '취소'
+  # 일예산 입력칸 id(#_r_d_)는 접속마다 바뀜 → 라벨로 찾아야 함 (TODO)
+
 # 파워클릭 일반그룹: 한 줄 = 키워드 1개 (입찰가가 키워드마다 있음)
 ad_list:
   row: TODO       # 키워드 한 줄. 예) table#keywordList tbody tr
