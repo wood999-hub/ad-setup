@@ -53,7 +53,7 @@ def cmd_setup(sel, args):
             if cur is None:
                 print(f"[없음] {ad['id']} {ad.get('name', '')} - 광고센터에서 먼저 상품을 등록하세요")
                 continue
-            diff = {k: ad[k] for k in ("bid", "daily_budget", "status") if k in ad and ad[k] != cur[k]}
+            diff = {k: ad[k] for k in ("bid", "daily_budget", "status") if k in ad and k in cur and ad[k] != cur[k]}
             if not diff:
                 print(f"[같음] {ad['id']} 변경 없음")
                 continue
@@ -77,7 +77,7 @@ def cmd_check(sel, args):
     for ad_id, want in wanted.items():
         cur = current.get(ad_id)
         bad = {k: (cur or {}).get(k) for k in ("bid", "daily_budget", "status")
-               if k in want and (cur is None or cur[k] != want[k])}
+               if k in want and (cur is None or (k in cur and cur[k] != want[k]))}
         if bad:
             ok = False
             print(f"  ✗ {ad_id}: 기대 {({k: want[k] for k in bad})} / 실제 {bad}")

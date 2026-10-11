@@ -76,11 +76,13 @@ def read_ads(page: Page, sel: dict) -> dict[str, dict]:
     result = {}
     for row in page.locator(s["row"]).all():
         ad_id = row.get_attribute(s["id_attr"])
-        result[ad_id] = {
-            "bid": _num(row.locator(s["bid"]).inner_text()),
-            "daily_budget": _num(row.locator(s["budget"]).inner_text()),
-            "status": row.locator(s["status"]).inner_text().strip(),
-        }
+        cur = {"bid": _num(row.locator(s["bid"]).inner_text())}
+        # 일예산/상태 칸은 화면에 없을 수 있다 (selectors.yaml 에서 비워두면 건너뜀)
+        if s.get("budget"):
+            cur["daily_budget"] = _num(row.locator(s["budget"]).inner_text())
+        if s.get("status"):
+            cur["status"] = row.locator(s["status"]).inner_text().strip()
+        result[ad_id] = cur
     return result
 
 

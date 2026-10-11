@@ -6,12 +6,13 @@ urls:
   ad_list: TODO   # 광고(그룹) 목록 화면 주소
   report: TODO    # 성과 리포트 화면 주소
 
+# 파워클릭 일반그룹: 한 줄 = 키워드 1개 (입찰가가 키워드마다 있음)
 ad_list:
-  row: TODO       # 광고 한 줄. 예) table#adList tbody tr
-  id_attr: TODO   # 그 줄에서 광고번호가 들어있는 속성. 예) data-ad-id
+  row: TODO       # 키워드 한 줄. 예) table#keywordList tbody tr
+  id_attr: TODO   # 그 줄에서 키워드/광고 번호가 들어있는 속성. 예) data-keyword-no
   bid: TODO       # 줄 안에서 입찰가 칸. 예) td.bid
-  budget: TODO
-  status: TODO
+  budget:         # 줄마다 일예산 칸이 없으면 비워둔다 (일반그룹은 보통 그룹 단위 예산)
+  status: TODO    # ON/OFF 칸. 없으면 비워둔다
 
 edit:
   open: TODO          # 줄 안의 '수정' 버튼
