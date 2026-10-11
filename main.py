@@ -138,7 +138,8 @@ def cmd_backup(sel, args):
         else:
             missing = [k for k, v in r["mapping"].items() if v is None]
             note = f" (못 찾은 칸: {', '.join(missing)})" if missing else ""
-            print(f"  ✓ {r['file']}: 키워드 {r['rows']}개{note}")
+            sample = merged[merged["source_file"] == r["file"]]["keyword"].head(3).tolist() if not merged.empty else []
+            print(f"  ✓ {r['file']}: 키워드 {r['rows']}개{note}  예) {', '.join(sample)}")
 
     if merged.empty:
         print("\n읽은 키워드가 없습니다.")
