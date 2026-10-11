@@ -7,6 +7,8 @@
   python main.py check              # keywords.csv 와 실제가 같은지 확인 + 캠페인 성과 읽기
   python main.py adjust             # 성과 규칙(rules.yaml)대로 입찰가 조정안 (기본: 미리보기만)
   python main.py off / on           # 모든 캠페인 광고 끄기 / 켜기 (주말 OFF 용)
+  python main.py plan --report 리포트.xlsx [--level keyword|product|group]
+                                    # 리포트 성과 → 최대입찰가·일예산 조정안 (검토용 엑셀)
   python main.py backup --folder 폴더  # 옛 광고센터에서 받은 키워드 엑셀들을 하나로 합쳐 백업
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
@@ -227,6 +229,36 @@ def _switch(sel, args, on: bool):
     log_change("on" if on else "off", "전체 캠페인", "", word, "수동/예약 실행")
 
 
+def cmd_plan(sel, args):
+    """리포트 엑셀 → 조정안(검토용 엑셀). 광고센터는 건드리지 않는다."""
+    import pandas as pd
+
+    from adbot import report, strategy
+
+    s = load("config/strategy.yaml")
+    df = report.read(Path(args.report), load("config/report_columns.yaml"))
+    missing = [m for m in df.attrs.get("missing", []) if m not in ("date", "budget", "keyword", "product_no", "bid")]
+    if missing:
+        print(f"⚠ 리포트에서 못 찾은 칸: {missing} → config/report_columns.yaml 확인 필요")
+    level = args.level
+    perfs, note = report.to_perfs(df, level, s["exclude_recent_days"])
+    changes = strategy.plan(perfs, s)
+    print(f"[{level}] {len(perfs)}개 · {note} · 기준 {'광고 상품' if s['basis'] == 'product' else '판매자'} ROAS, 목표 {s['target_roas']}%")
+    names = {"raise": "올림", "lower": "내림", "candidate_off": "삭제/OFF 후보", "budget_up": "예산 올림", "hold": "유지"}
+    rows = []
+    for c in changes:
+        label = " / ".join(str(v) for v in c.key.values())
+        if c.action != "hold":
+            print(f"  [{names[c.action]}] {label}: {c.before:,} → {c.after:,}  ({c.reason})")
+        rows.append({**c.key, "조치": names[c.action], "변경 전": c.before, "변경 후": c.after, "근거": c.reason, **c.metrics})
+    out = ROOT / "data" / f"조정안_{level}_{datetime.now():%Y%m%d_%H%M}.xlsx"
+    out.parent.mkdir(exist_ok=True)
+    pd.DataFrame(rows).to_excel(out, index=False)
+    n = sum(c.action != "hold" for c in changes)
+    print(f"\n변경 {n}건 / 유지 {len(changes) - n}건 → 검토용: {out}")
+    print("※ 업로드용 엑셀은 광고센터 엑셀등록 템플릿을 받은 뒤 만들 수 있습니다.")
+
+
 def cmd_backup(sel, args):
     from pathlib import Path
 
@@ -288,7 +320,7 @@ def cmd_inspect(sel, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "backup", "inspect"])
+    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "plan", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
@@ -296,11 +328,13 @@ def main():
     ap.add_argument("--keywords", help="입찰가 파일 (기본: config/keywords.csv)")
     ap.add_argument("--rules", default="config/rules.yaml")
     ap.add_argument("--folder", default="backup", help="backup: 키워드 엑셀 파일들이 있는 폴더")
+    ap.add_argument("--report", help="plan: 광고센터에서 받은 리포트 엑셀 파일")
+    ap.add_argument("--level", default="keyword", choices=["keyword", "product", "group"], help="plan: 판단 단위")
     args = ap.parse_args()
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "pull": cmd_pull, "setup": cmd_setup, "check": cmd_check,
-     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
+     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "plan": cmd_plan, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":
