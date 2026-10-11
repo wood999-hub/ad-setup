@@ -174,7 +174,11 @@ def cmd_inspect(sel, args):
     from adbot import inspect_page
 
     with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
-        page.goto(site.url(sel, "login"))
+        print("브라우저를 여는 중... (따로 뜨는 새 창에서 로그인하세요)")
+        try:
+            page.goto(site.url(sel, "login"), wait_until="domcontentloaded")
+        except Exception as e:  # 첫 화면 로딩이 느려도 조사는 계속할 수 있게
+            print(f"(첫 화면 로딩 지연: {e.__class__.__name__}) 브라우저에서 직접 주소를 열어도 됩니다.")
         print("브라우저가 열렸습니다. 로그인이 필요하면 브라우저에서 직접 로그인하세요.")
         inspect_page.run(page)
     print("끝. 로그인 세션도 저장했습니다 (다음부터 로그인 생략).")
