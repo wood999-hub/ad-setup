@@ -9,6 +9,8 @@ from playwright.sync_api import Page
 
 from .site import resolve
 
+SELLER_NAME = ""  # 내 가게 이름 (config/rank.yaml 의 seller) - main 에서 설정
+
 CORE = r"""
   const ownText = e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
   const isAdLabel = e => /^(AD|광고)$/i.test(ownText(e)) || /^(AD|광고)$/i.test((e.getAttribute && e.getAttribute('aria-label')) || '');
@@ -40,7 +42,8 @@ CORE = r"""
     seen.add(code);
     const card = a.closest('li, [class*="box__item-container"], [class*="box__component"], [class*="item"]') || a.parentElement;
     const sec = adSection(card);
-    items.push({code, ad: !!sec, sec, card});
+    const seller = !!SELLER && (card.innerText || '').includes(SELLER);
+    items.push({code, ad: !!sec, sec, card, seller});
   }
   // 광고 구역별 순서 (구역마다 1위부터)
   const secs = [...new Set(items.filter(i => i.sec).map(i => i.sec))];
@@ -50,8 +53,8 @@ CORE = r"""
   }
 """
 
-JS = "() => {" + CORE + """
-  return items.map(i => ({code: i.code, ad: i.ad, adRank: i.adRank || null, section: i.secName || '',
+JS = "(SELLER) => {" + CORE + """
+  return items.map(i => ({code: i.code, ad: i.ad, adRank: i.adRank || null, section: i.secName || '', seller: i.seller,
                           title: ((i.card.innerText || '').trim().split('\\n').find(t => t.length > 6) || '').slice(0, 30)}));
 }"""
 
@@ -72,7 +75,7 @@ def read_current(page: Page) -> list[dict]:
     page.wait_for_timeout(1500)
     page.mouse.wheel(0, 2500)
     page.wait_for_timeout(1000)
-    return page.evaluate(JS)
+    return page.evaluate(JS, SELLER_NAME)
 
 
 DIAG = r"""
@@ -92,21 +95,23 @@ def diagnose(page: Page) -> dict:
 
 
 def position(items: list[dict], product_nos: set[str]) -> dict:
-    """전체 순서 / 광고 상품 중 순서 (1부터, 없으면 None)."""
+    """전체 순서 / 광고 상품 중 순서 (1부터, 없으면 None). 상품번호 또는 판매자 이름이 맞으면 내 상품."""
+    is_mine = lambda i: i["code"] in product_nos or i.get("seller")
     ads = [i for i in items if i["ad"]]
-    overall = next((n for n, i in enumerate(items, 1) if i["code"] in product_nos), None)
-    mine = [i for i in ads if i["code"] in product_nos]
+    overall = next((n for n, i in enumerate(items, 1) if is_mine(i)), None)
+    mine = [i for i in ads if is_mine(i)]
     best = min(mine, key=lambda i: i.get("adRank") or 999) if mine else None
     ad_rank = (best.get("adRank") or ads.index(best) + 1) if best else None
     return {"overall": overall, "ad": ad_rank, "section": best.get("section", "") if best else "",
             "ad_count": len(ads), "total": len(items)}
 
 
-BOOKMARKLET = "(() => { const MINE = new Set(__MINE__), TARGET = __TARGET__;" + CORE + r"""
-  const all = items.findIndex(i => MINE.has(i.code)) + 1;
-  const mineAds = items.filter(i => i.ad && MINE.has(i.code)).sort((x, y) => x.adRank - y.adRank);
+BOOKMARKLET = "(() => { const MINE = new Set(__MINE__), TARGET = __TARGET__, SELLER = __SELLER__;" + CORE + r"""
+  const isMine = i => MINE.has(i.code) || i.seller;
+  const all = items.findIndex(isMine) + 1;
+  const mineAds = items.filter(i => i.ad && isMine(i)).sort((x, y) => x.adRank - y.adRank);
   const best = mineAds[0];
-  items.filter(i => MINE.has(i.code)).forEach(i => { i.card.style.outline = '4px solid #E5484D'; });
+  items.filter(isMine).forEach(i => { i.card.style.outline = '4px solid #E5484D'; });
   if (best) best.card.scrollIntoView({block: 'center'});
   secs.forEach(sec => { sec.style.outline = '2px dashed #2F6BFF'; });
   const kw = decodeURIComponent((location.search.match(/keyword=([^&]*)/) || [])[1] || '').replace(/\+/g, ' ');
@@ -120,10 +125,11 @@ BOOKMARKLET = "(() => { const MINE = new Set(__MINE__), TARGET = __TARGET__;" + 
 """
 
 
-def bookmarklet(product_nos: set[str], target: int) -> str:
+def bookmarklet(product_nos: set[str], target: int, seller: str = "") -> str:
     import json
     import re
-    code = BOOKMARKLET.replace("__MINE__", json.dumps(sorted(product_nos))).replace("__TARGET__", str(target))
+    code = (BOOKMARKLET.replace("__MINE__", json.dumps(sorted(product_nos))).replace("__TARGET__", str(target))
+            .replace("__SELLER__", json.dumps(seller, ensure_ascii=False)))
     code = re.sub(r"\s//[^\n]*", "", code)            # 한 줄로 합치기 전에 // 주석 제거
     code = re.sub(r"\s*\n\s*", " ", code).strip()
     return "javascript:" + quote(code, safe="(){}[]=;:,.'!*/<>&|?+-_ ")

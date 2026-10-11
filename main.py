@@ -288,6 +288,7 @@ def cmd_rank(sel, args):
         print("확인할 키워드/상품이 없습니다. 먼저 [1. 가져오기] 를 누르거나 config/rank.yaml 에 적으세요.")
         return
     important = set(cfg["important"])
+    rank.SELLER_NAME = cfg.get("seller", "")
     stamp = f"{datetime.now():%Y%m%d_%H%M}"
     out_rows, outside = [], []
     print(f"내 상품 {', '.join(sorted(mine))} · 기준: 중요 {cfg['important_target']}위 / 일반 {cfg['normal_target']}위 (광고 영역 순서)")
@@ -356,7 +357,7 @@ def cmd_rank_tabs(sel, args):
         print("확인할 키워드/상품이 없습니다. 먼저 [1. 가져오기] 를 누르세요.")
         return
     target = cfg["normal_target"]
-    link = rank.bookmarklet(mine, target)
+    link = rank.bookmarklet(mine, target, cfg.get("seller", ""))
     page = ROOT / "data" / "내순위_북마크.html"
     page.parent.mkdir(exist_ok=True)
     page.write_text(f"""<!doctype html><meta charset="utf-8"><title>내 순위 북마크 설치</title>
@@ -366,7 +367,7 @@ def cmd_rank_tabs(sel, args):
 <li>아래 파란 버튼을 마우스로 <b>끌어서 북마크바에 놓습니다.</b> (누르지 말고 끌기)</li></ol>
 <p><a href="{link}" style="display:inline-block;padding:12px 22px;background:#2F6BFF;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">내 순위</a></p>
 <h3>사용법</h3><p>G마켓 검색 결과 화면에서 북마크바의 <b>[내 순위]</b> 를 누르면,
-내 상품({', '.join(sorted(mine))})에 빨간 테두리가 생기고 오른쪽 위에 광고 몇 위인지 나옵니다. 목표: 광고 {target}위 안.</p>
+내 상품({', '.join(sorted(mine))}{(', 판매자 ' + cfg['seller']) if cfg.get('seller') else ''})에 빨간 테두리가 생기고 오른쪽 위에 광고 몇 위인지 나옵니다. 목표: 광고 {target}위 안.</p>
 <p style="color:#888">상품번호나 목표가 바뀌면 프로그램에서 [순위 확인]을 다시 누르면 이 페이지가 새로 만들어집니다. 북마크도 다시 끌어 놓으세요.</p>
 </body>""", encoding="utf-8")
     if args.setup:

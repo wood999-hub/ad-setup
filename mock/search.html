@@ -13,6 +13,6 @@ const kw = decodeURIComponent((location.search.match(/keyword=([^&]*)/) || [])[1
 const myAd = {"키트": 2, "과학키트": 6, "미술놀이": 4}[kw];       // 광고 구역 안 내 상품 위치
 const li = (code, t) => `<li class="box__item-container"><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">${t}</a><span>19,530원</span></li>`;
 let h = ""; for (let i = 1; i <= 5; i++) h += li(6000000000 + i, `위쪽 상품 ${i} 만들기`); topList.innerHTML = h;
-h = ""; for (let i = 1; i <= 8; i++) h += li(myAd === i ? "2168720238" : 3000000000 + i, `광고상품 ${i} 만들기 키트`); ads.innerHTML = h;
+h = ""; for (let i = 1; i <= 8; i++) h += li(myAd === i ? "2168720238" : 3000000000 + i, `광고상품 ${i} 만들기 키트 ${kw === "공예" && i === 3 ? "에브리즘" : "다른가게"}`); ads.innerHTML = h;
 h = ""; for (let i = 1; i <= 10; i++) h += li(!myAd && kw === "공예" && i === 3 ? "2168720238" : 4000000000 + i, `일반상품 ${i}`); normal.innerHTML = h;
 </script></body></html>

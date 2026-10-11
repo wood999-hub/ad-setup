@@ -8,6 +8,8 @@ important_target: 4
 normal_target: 4          # 모든 키워드 3~4위 목표 (2026-10-11 요청). 일반 키워드를 8위로 하려면 8
 important: []              # 예) [키트, 과학키트]  ← 중요 키워드 이름을 적으세요
 
+seller: 에브리즘           # 내 가게 이름 - 상품 칸에 이 이름이 있으면 내 상품으로 봄 (상품번호와 함께 사용)
+
 # 확인할 키워드/상품: 비워두면 config/keywords.csv(가져오기 결과)의 키워드·상품번호를 사용
 keywords: []
 product_nos: []
