@@ -6,6 +6,7 @@
   python main.py adjust             # 규칙대로 입찰가 조정안 출력 (기본: 미리보기만)
   python main.py adjust --apply     # 조정안을 실제로 반영
   python main.py backup --folder 폴더  # 다운받은 키워드 엑셀들을 하나로 합쳐 백업
+  python main.py inspect            # 화면 구조 조사 (selectors.yaml 채우기용)
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
 """
@@ -169,9 +170,19 @@ def cmd_backup(sel, args):
         print("※ 파일 안에 그룹명이 없어서 파일 이름을 그룹명으로 썼습니다. 파일 이름을 그룹명으로 바꿔두세요.")
 
 
+def cmd_inspect(sel, args):
+    from adbot import inspect_page
+
+    with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
+        page.goto(site.url(sel, "login"))
+        print("브라우저가 열렸습니다. 로그인이 필요하면 브라우저에서 직접 로그인하세요.")
+        inspect_page.run(page)
+    print("끝. 로그인 세션도 저장했습니다 (다음부터 로그인 생략).")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "setup", "check", "adjust", "backup"])
+    ap.add_argument("command", choices=["login", "setup", "check", "adjust", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
@@ -182,7 +193,7 @@ def main():
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "setup": cmd_setup,
-     "check": cmd_check, "adjust": cmd_adjust, "backup": cmd_backup}[args.command](sel, args)
+     "check": cmd_check, "adjust": cmd_adjust, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":
