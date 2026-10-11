@@ -1,6 +1,7 @@
 # G마켓 검색 결과에서 내 상품 위치 확인 (참고용 - 개인화 때문에 고객이 보는 순위와 다를 수 있음)
 search_url: "https://www.gmarket.co.kr/n/search?keyword={keyword}"
 repeats: 1                 # 키워드마다 몇 번 검색해서 평균낼지 (늘리면 느려짐)
+show_browser: true         # true = 검색할 때 브라우저 창을 보여줌 (숨김 브라우저는 G마켓이 막을 수 있음)
 
 # 순위권 기준: 중요 키워드는 important_target 위 안, 나머지는 normal_target 위 안
 important_target: 4

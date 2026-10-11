@@ -34,10 +34,29 @@ JS = r"""
 
 def search(page: Page, url_tpl: str, keyword: str) -> list[dict]:
     page.goto(resolve(url_tpl.format(keyword=quote(keyword))), wait_until="domcontentloaded")
-    page.wait_for_timeout(2500)          # 상품 목록이 늦게 뜨는 경우
-    page.mouse.wheel(0, 3000)            # 아래쪽 상품도 불러오기
-    page.wait_for_timeout(1000)
-    return page.evaluate(JS)
+    for _ in range(6):                   # 상품 목록이 늦게 뜨면 최대 약 12초까지 기다림
+        page.wait_for_timeout(2000)
+        page.mouse.wheel(0, 2500)        # 아래쪽 상품도 불러오기
+        items = page.evaluate(JS)
+        if len(items) >= 10:
+            break
+    return items
+
+
+DIAG = r"""
+() => {
+  const links = [...document.querySelectorAll('a[href]')].map(a => a.href);
+  const itemish = links.filter(h => /item|goods|product|\d{9,}/i.test(h));
+  return {title: document.title, url: location.href, links: links.length,
+          sample: [...new Set(itemish)].slice(0, 8),
+          text: (document.body.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 200)};
+}
+"""
+
+
+def diagnose(page: Page) -> dict:
+    """상품을 못 찾았을 때 화면이 어떤 상태인지 (차단 화면인지, 링크 모양이 다른지)."""
+    return page.evaluate(DIAG)
 
 
 def position(items: list[dict], product_nos: set[str]) -> dict:

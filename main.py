@@ -291,7 +291,8 @@ def cmd_rank(sel, args):
     stamp = f"{datetime.now():%Y%m%d_%H%M}"
     out_rows, outside = [], []
     print(f"내 상품 {', '.join(sorted(mine))} · 기준: 중요 {cfg['important_target']}위 / 일반 {cfg['normal_target']}위 (광고 영역 순서)")
-    with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
+    headless = args.headless and not cfg.get("show_browser", False)
+    with site.open_page(headless=headless, mock=args.site == "mock") as page:
         for i, kw in enumerate(keywords):
             results = []
             for _ in range(cfg["repeats"]):
@@ -311,6 +312,15 @@ def cmd_rank(sel, args):
                 outside.append(kw)
             out_rows.append({"keyword": kw, "important": kw in important, "ad_rank": ad_rank,
                              "overall": overall[0] if overall else None, "target": target, "ok": ok})
+            if not items:  # 상품을 하나도 못 읽음 → 화면 상태를 보여주고 멈춤
+                d = rank.diagnose(page)
+                print(f"\n⚠ 검색 화면에서 상품을 못 읽었습니다. 화면 상태:")
+                print(f"   제목: {d['title']}\n   주소: {d['url']}\n   링크 {d['links']}개, 상품처럼 보이는 링크 예: {d['sample']}")
+                print(f"   화면 글자: {d['text']}")
+                shot = site.screenshot(page, f"rank_fail_{stamp}")
+                (ROOT / "data" / f"rank_fail_{stamp}.html").write_text(page.content(), encoding="utf-8")
+                print(f"   화면 캡처: {shot}\n→ 위 내용을 Claude 에게 보내주세요.")
+                return
             if i == 0 or args.debug:  # 첫 키워드는 화면과 비교할 수 있게 상위 15개를 보여줌
                 print("     [화면 비교용] 상위 15개:", "  ".join(
                     f"{n}.{'AD ' if it['ad'] else ''}{it['code']}{'◀내상품' if it['code'] in mine else ''}"
