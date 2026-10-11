@@ -1,0 +1,12 @@
+# 자동 수정 규칙. 숫자만 바꾸면 전략이 바뀐다.
+target_roas: 300                      # 목표 ROAS(%) = 매출/광고비*100
+min_clicks: 20                        # 클릭이 이보다 적으면 판단 보류
+lower_below_ratio: 0.8                # ROAS < 목표*0.8 이면 입찰가 내림
+raise_above_ratio: 1.2                # ROAS > 목표*1.2 이면 입찰가 올림
+step_down_pct: 15                     # 내릴 때 %
+step_up_pct: 10                       # 올릴 때 %
+pause_cost_without_conversion: 30000  # 전환 0인데 이만큼 쓰면 광고 OFF
+bid_min: 70                           # 입찰가 하한(원)
+bid_max: 3000                         # 입찰가 상한(원)
+bid_unit: 10                          # 입찰가 단위(원)
+max_changes_per_run: 10               # 한 번에 이보다 많이 바꾸려 하면 중단(안전장치)

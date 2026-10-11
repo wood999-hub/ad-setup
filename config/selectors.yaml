@@ -1,0 +1,33 @@
+# 실제 광고센터용 화면 주소/요소 위치.
+# TODO 부분은 직접 채워야 한다 → README "3단계: 화면 요소 찾기" 참고
+# (mock/selectors.yaml 이 완성된 예시)
+urls:
+  login: https://www.esmplus.com/
+  ad_list: TODO   # 광고(그룹) 목록 화면 주소
+  report: TODO    # 성과 리포트 화면 주소
+
+ad_list:
+  row: TODO       # 광고 한 줄. 예) table#adList tbody tr
+  id_attr: TODO   # 그 줄에서 광고번호가 들어있는 속성. 예) data-ad-id
+  bid: TODO       # 줄 안에서 입찰가 칸. 예) td.bid
+  budget: TODO
+  status: TODO
+
+edit:
+  open: TODO          # 줄 안의 '수정' 버튼
+  bid_input: TODO
+  budget_input: TODO
+  status_select: TODO
+  save: TODO
+  saved_signal: TODO  # 저장 성공 시 나타나는 요소(알림창 등)
+
+report:
+  row: TODO
+  columns:            # 리포트 표에서 몇 번째 칸인지 (0부터 셈)
+    ad_id: 0
+    bid: 1
+    impressions: 2
+    clicks: 3
+    cost: 4
+    conversions: 5
+    revenue: 6

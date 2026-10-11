@@ -1,0 +1,32 @@
+# 연습용 가짜 광고센터(mock/*.html)에 맞춘 완성 예시.
+# 실제 광고센터용 config/selectors.yaml 을 채울 때 이 형식을 따라하면 된다.
+urls:
+  login: mock/ads.html
+  ad_list: mock/ads.html
+  report: mock/report.html
+
+ad_list:
+  row: "#adList tbody tr"
+  id_attr: data-ad-id
+  bid: td.bid
+  budget: td.budget
+  status: td.status
+
+edit:
+  open: button.edit
+  bid_input: "#bidInput"
+  budget_input: "#budgetInput"
+  status_select: "#statusSelect"
+  save: "#saveBtn"
+  saved_signal: "#toast.show"
+
+report:
+  row: "#report tbody tr"
+  columns:
+    ad_id: 0
+    bid: 1
+    impressions: 2
+    clicks: 3
+    cost: 4
+    conversions: 5
+    revenue: 6
