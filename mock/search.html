@@ -1,20 +1,18 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><title>G마켓 검색 (연습용)</title></head><body>
-<h1>검색 결과 (연습용)</h1>
-<ul id="list"></ul>
+<html lang="ko"><head><meta charset="utf-8"><title>G마켓 - 검색결과 (연습용)</title></head><body>
+<!-- 실제 G마켓 구조 흉내 (2026-10-11 캡처 기준): 위쪽 상품 줄(광고 표시 없음) + '먼저 둘러보세요' 구역(오른쪽 위 '광고' 표시) -->
+<div class="box__top-carousel"><ul id="topList"></ul></div>
+<div class="section__module">
+  <div class="box__head"><h3 class="text__title">먼저 둘러보세요</h3>
+    <div class="box__util"><a href="#">상품등록</a> | <button class="button__ad">광고<i class="icon"></i></button></div></div>
+  <ul id="ads"></ul>
+</div>
+<div class="section__module"><h3>전체 상품</h3><ul id="normal"></ul></div>
 <script>
-// 키워드마다 내 상품(2168720238) 위치가 다르게: 키트=광고2위, 과학키트=광고6위, 공예=광고 없음(일반 3번째)
 const kw = decodeURIComponent((location.search.match(/keyword=([^&]*)/) || [])[1] || "");
-const myAd = {"키트": 2, "과학키트": 6, "미술놀이": 4}[kw];
-const list = document.getElementById("list");
-let html = "";
-for (let i = 1; i <= 10; i++) {   // 광고 10개
-  const code = (myAd === i) ? "2168720238" : String(3000000000 + i);
-  html += `<li class="box__item-container"><span class="text__ad">AD</span><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">광고상품 ${i} 만들기 키트</a></li>`;
-}
-for (let i = 1; i <= 10; i++) {   // 일반 상품
-  const code = (!myAd && kw === "공예" && i === 3) ? "2168720238" : String(4000000000 + i);
-  html += `<li class="box__item-container"><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">일반상품 ${i} 공예 키트</a></li>`;
-}
-list.innerHTML = html;
+const myAd = {"키트": 2, "과학키트": 6, "미술놀이": 4}[kw];       // 광고 구역 안 내 상품 위치
+const li = (code, t) => `<li class="box__item-container"><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">${t}</a><span>19,530원</span></li>`;
+let h = ""; for (let i = 1; i <= 5; i++) h += li(6000000000 + i, `위쪽 상품 ${i} 만들기`); topList.innerHTML = h;
+h = ""; for (let i = 1; i <= 8; i++) h += li(myAd === i ? "2168720238" : 3000000000 + i, `광고상품 ${i} 만들기 키트`); ads.innerHTML = h;
+h = ""; for (let i = 1; i <= 10; i++) h += li(!myAd && kw === "공예" && i === 3 ? "2168720238" : 4000000000 + i, `일반상품 ${i}`); normal.innerHTML = h;
 </script></body></html>

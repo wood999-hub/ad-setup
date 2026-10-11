@@ -9,27 +9,51 @@ from playwright.sync_api import Page
 
 from .site import resolve
 
-JS = r"""
-() => {
+CORE = r"""
+  const ownText = e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+  const isAdLabel = e => /^(AD|광고)$/i.test(ownText(e)) || /^(AD|광고)$/i.test((e.getAttribute && e.getAttribute('aria-label')) || '');
+  const LINK = 'a[href*="goodscode="], a[href*="goodsCode="], [data-montelena-goodscode]';
+  const adSection = card => {           // 위로 올라가며 '광고' 표시가 있는 가장 가까운 구역을 찾는다
+    let el = card;
+    for (let d = 0; el && d < 12; d++, el = el.parentElement) {
+      if (el.querySelectorAll(LINK).length > 60) return null;   // 페이지 전체만큼 넓어지면 중단
+      const label = [...el.querySelectorAll('*')].find(isAdLabel);
+      if (label) {
+        // '광고' 표시가 들어있는 부분(제목 줄)에는 상품이 없어야 진짜 그 구역의 표시.
+        // (상품이 있으면 옆 광고 구역의 표시를 잘못 잡은 것 → 일반 상품)
+        let part = label; while (part.parentElement !== el) part = part.parentElement;
+        return part.querySelector(LINK) && !part.contains(card) ? null : el;
+      }
+    }
+    return null;
+  };
+  const sectionName = sec => {
+    const t = [...sec.querySelectorAll('h1,h2,h3,h4,strong,span,div,p')].map(ownText).find(x => x && x.length >= 3 && x.length <= 20 && !/^(AD|광고|상품등록)$/.test(x));
+    return t || '광고 구역';
+  };
   const seen = new Set(), items = [];
-  const nodes = document.querySelectorAll('a[href*="goodscode="], a[href*="goodsCode="], [data-montelena-goodscode]');
-  for (const a of nodes) {
-    const m = (a.getAttribute('href') || '').match(/goods[cC]ode=(\d+)/) ;
+  for (const a of document.querySelectorAll(LINK)) {
+    const m = (a.getAttribute('href') || '').match(/goods[cC]ode=(\d+)/);
     const code = m ? m[1] : a.getAttribute('data-montelena-goodscode');
     if (!code || seen.has(code)) continue;
-    const r = a.getBoundingClientRect();
-    if (r.width === 0 && r.height === 0) continue;          // 숨은 링크 제외
+    const r = a.getBoundingClientRect(); if (r.width === 0 && r.height === 0) continue;
     seen.add(code);
     const card = a.closest('li, [class*="box__item-container"], [class*="box__component"], [class*="item"]') || a.parentElement;
-    const isAd = [...card.querySelectorAll('*')].some(e =>
-      e.children.length === 0 && /^(AD|광고)$/i.test((e.innerText || e.getAttribute('aria-label') || '').trim()))
-      || /(^|[_-])ad([_-]|$)/i.test(card.className || '');
-    const title = (card.innerText || '').trim().split('\n').find(t => t.length > 6) || '';
-    items.push({code, ad: isAd, title: title.slice(0, 30)});
+    const sec = adSection(card);
+    items.push({code, ad: !!sec, sec, card});
   }
-  return items;
-}
+  // 광고 구역별 순서 (구역마다 1위부터)
+  const secs = [...new Set(items.filter(i => i.sec).map(i => i.sec))];
+  for (const i of items) if (i.sec) {
+    const same = items.filter(j => j.sec === i.sec);
+    i.adRank = same.indexOf(i) + 1; i.secName = sectionName(i.sec); i.secSize = same.length;
+  }
 """
+
+JS = "() => {" + CORE + """
+  return items.map(i => ({code: i.code, ad: i.ad, adRank: i.adRank || null, section: i.secName || '',
+                          title: ((i.card.innerText || '').trim().split('\\n').find(t => t.length > 6) || '').slice(0, 30)}));
+}"""
 
 
 def search(page: Page, url_tpl: str, keyword: str) -> list[dict]:
@@ -71,34 +95,27 @@ def position(items: list[dict], product_nos: set[str]) -> dict:
     """전체 순서 / 광고 상품 중 순서 (1부터, 없으면 None)."""
     ads = [i for i in items if i["ad"]]
     overall = next((n for n, i in enumerate(items, 1) if i["code"] in product_nos), None)
-    ad_rank = next((n for n, i in enumerate(ads, 1) if i["code"] in product_nos), None)
-    return {"overall": overall, "ad": ad_rank, "ad_count": len(ads), "total": len(items)}
+    mine = [i for i in ads if i["code"] in product_nos]
+    best = min(mine, key=lambda i: i.get("adRank") or 999) if mine else None
+    ad_rank = (best.get("adRank") or ads.index(best) + 1) if best else None
+    return {"overall": overall, "ad": ad_rank, "section": best.get("section", "") if best else "",
+            "ad_count": len(ads), "total": len(items)}
 
 
-BOOKMARKLET = r"""
-(() => {
-  const MINE = new Set(__MINE__), TARGET = __TARGET__;
-  const seen = new Set(), items = [];
-  for (const a of document.querySelectorAll('a[href*="goodscode="], a[href*="goodsCode="], [data-montelena-goodscode]')) {
-    const m = (a.getAttribute('href') || '').match(/goods[cC]ode=(\d+)/);
-    const code = m ? m[1] : a.getAttribute('data-montelena-goodscode');
-    if (!code || seen.has(code)) continue;
-    const r = a.getBoundingClientRect(); if (r.width === 0 && r.height === 0) continue;
-    seen.add(code);
-    const card = a.closest('li, [class*="box__item-container"], [class*="box__component"], [class*="item"]') || a.parentElement;
-    const ad = [...card.querySelectorAll('*')].some(e => e.children.length === 0 && /^(AD|광고)$/i.test((e.innerText || '').trim()));
-    items.push({code, ad, card});
-  }
-  const ads = items.filter(i => i.ad);
+BOOKMARKLET = "(() => { const MINE = new Set(__MINE__), TARGET = __TARGET__;" + CORE + r"""
   const all = items.findIndex(i => MINE.has(i.code)) + 1;
-  const adr = ads.findIndex(i => MINE.has(i.code)) + 1;
-  items.filter(i => MINE.has(i.code)).forEach(i => { i.card.style.outline = '4px solid #E5484D'; i.card.scrollIntoView({block: 'center'}); });
+  const mineAds = items.filter(i => i.ad && MINE.has(i.code)).sort((x, y) => x.adRank - y.adRank);
+  const best = mineAds[0];
+  items.filter(i => MINE.has(i.code)).forEach(i => { i.card.style.outline = '4px solid #E5484D'; });
+  if (best) best.card.scrollIntoView({block: 'center'});
+  secs.forEach(sec => { sec.style.outline = '2px dashed #2F6BFF'; });
   const kw = decodeURIComponent((location.search.match(/keyword=([^&]*)/) || [])[1] || '').replace(/\+/g, ' ');
-  const ok = adr && adr <= TARGET;
+  const ok = best && best.adRank <= TARGET;
   const box = document.getElementById('my-rank-box') || document.body.appendChild(Object.assign(document.createElement('div'), {id: 'my-rank-box'}));
-  box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;padding:14px 18px;border-radius:10px;font:bold 16px sans-serif;color:#fff;box-shadow:0 4px 16px #0004;background:' + (ok ? '#13A35B' : '#E5484D');
-  box.innerText = (kw ? '[' + kw + '] ' : '') + (adr ? '광고 ' + adr + '위' : '광고 영역에 없음') + (all ? ' · 전체 ' + all + '번째' : '') +
-                  '\n목표 ' + TARGET + '위 안: ' + (ok ? '✓ 통과' : '✗ 순위권 밖') + '  (광고 ' + ads.length + '개 / 상품 ' + items.length + '개)';
+  box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;padding:14px 18px;border-radius:10px;font:bold 16px sans-serif;color:#fff;box-shadow:0 4px 16px #0004;white-space:pre;background:' + (ok ? '#13A35B' : '#E5484D');
+  box.innerText = (kw ? '[' + kw + '] ' : '') + (best ? best.secName + ' 광고 ' + best.adRank + '위 (구역 ' + best.secSize + '개 중)' : '광고 구역에 없음') +
+                  (all ? ' · 전체 ' + all + '번째' : '') + '\n목표 ' + TARGET + '위 안: ' + (ok ? '✓ 통과' : '✗ 순위권 밖') +
+                  '  (광고 구역 ' + secs.length + '개 · 광고 ' + items.filter(i => i.ad).length + '개 / 상품 ' + items.length + '개)';
 })();
 """
 
@@ -107,5 +124,6 @@ def bookmarklet(product_nos: set[str], target: int) -> str:
     import json
     import re
     code = BOOKMARKLET.replace("__MINE__", json.dumps(sorted(product_nos))).replace("__TARGET__", str(target))
+    code = re.sub(r"\s//[^\n]*", "", code)            # 한 줄로 합치기 전에 // 주석 제거
     code = re.sub(r"\s*\n\s*", " ", code).strip()
     return "javascript:" + quote(code, safe="(){}[]=;:,.'!*/<>&|?+-_ ")

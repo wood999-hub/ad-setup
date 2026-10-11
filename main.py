@@ -308,7 +308,8 @@ def cmd_rank(sel, args):
             overall = [r["overall"] for r in results if r["overall"]]
             target = cfg["important_target"] if kw in important else cfg["normal_target"]
             ok = ad_rank is not None and ad_rank <= target
-            where = f"광고 {ad_rank}위" if ad_rank else "광고 영역에 없음"
+            sec = results[-1].get("section", "")
+            where = f"{sec} 광고 {ad_rank}위" if ad_rank else "광고 구역에 없음"
             extra = f", 전체 {overall[0]}번째" if overall else ""
             if items:
                 print(f"  {'✓' if ok else '✗'} {kw}{' (중요)' if kw in important else ''}: {where}{extra} / 목표 {target}위 안 "
