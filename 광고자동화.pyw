@@ -91,7 +91,7 @@ class App:
         FlatButton(right, "로그인", self.login).pack(side="right")
         FlatButton(right, "광고 켜기", lambda: self.switch(True)).pack(side="right", padx=(0, 6))
         FlatButton(right, "광고 끄기", lambda: self.switch(False)).pack(side="right", padx=(0, 6))
-        FlatButton(right, "순위 확인", lambda: self.run("rank"), primary=True).pack(side="right", padx=(0, 6))
+        FlatButton(right, "순위 확인", lambda: self.run("rank-tabs"), primary=True).pack(side="right", padx=(0, 6))
 
     def _steps(self):
         row = tk.Frame(self.root, bg=BG)
@@ -133,7 +133,7 @@ class App:
     def _footer(self):
         foot = tk.Frame(self.root, bg=BG)
         foot.pack(side="bottom", fill="x", padx=24, pady=(0, 12))
-        for text, cmd in [("리포트 분석", self.analyze), ("사용설명서", self.open_manual), ("변경 기록", self.open_log), ("화면 조사", self.inspect),
+        for text, cmd in [("북마크 설치", lambda: self.run("rank-tabs", "--setup")), ("리포트 분석", self.analyze), ("사용설명서", self.open_manual), ("변경 기록", self.open_log), ("화면 조사", self.inspect),
                           ("프로그램 업데이트", self.update)]:
             FlatButton(foot, text, cmd, small=True).pack(side="left", padx=(0, 6))
         tk.Label(foot, text="반영 전에는 항상 미리보기로 확인하세요", bg=BG, fg=MUTED, font=font(9)).pack(side="right")
@@ -168,7 +168,7 @@ class App:
 
     # ---------- 실행 ----------
     NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트",
-             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사", "plan": "리포트 분석", "rank": "순위 확인"}
+             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사", "plan": "리포트 분석", "rank": "순위 확인", "rank-tabs": "순위 확인", "rank-setup": "북마크 설치"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
@@ -187,6 +187,12 @@ class App:
                                          stdin=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                                          creationflags=NO_WINDOW)
             for line in self.proc.stdout:
+                if line.startswith("@@WAIT_USER@@"):  # 프로그램이 사람의 조치를 기다림 → 안내창
+                    msg = line.removeprefix("@@WAIT_USER@@").strip()
+                    while not msg.endswith("누르세요."):
+                        msg += "\n" + self.proc.stdout.readline().strip()
+                    self.root.after(0, self.ask_user, msg)
+                    continue
                 self.root.after(0, self.write, line)
             code = self.proc.wait()
             if code == 0:
@@ -196,6 +202,15 @@ class App:
             self.root.after(0, self.set_busy, False)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def ask_user(self, msg: str):
+        self.write(f"\n⏸ {msg}\n", "chg")
+        messagebox.showinfo("확인이 필요합니다", msg)
+        try:
+            self.proc.stdin.write("\n")
+            self.proc.stdin.flush()
+        except Exception:
+            pass
 
     def login(self):
         self.run("login")

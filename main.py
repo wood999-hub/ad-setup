@@ -297,22 +297,27 @@ def cmd_rank(sel, args):
             results = []
             for _ in range(cfg["repeats"]):
                 items = rank.search(page, sel.get("rank_url") or cfg["search_url"], kw)
+                if not items:  # 봇 확인 등으로 상품이 안 보임 → 사람이 직접 풀고 그 화면을 다시 읽음
+                    print(f"@@WAIT_USER@@ 브라우저 창에 '봇 확인'(보안 문자 등)이 떠 있으면 직접 풀어 주세요.\n"
+                          f"'{kw}' 검색 결과(상품 목록)가 보이면 [확인] 을 누르세요.", flush=True)
+                    input()
+                    items = rank.read_current(page)
                 results.append(rank.position(items, mine))
             ads = [r["ad"] for r in results if r["ad"]]
             ad_rank = round(mean(ads), 1) if ads else None
             overall = [r["overall"] for r in results if r["overall"]]
             target = cfg["important_target"] if kw in important else cfg["normal_target"]
             ok = ad_rank is not None and ad_rank <= target
-            mark = "✓" if ok else "✗"
             where = f"광고 {ad_rank}위" if ad_rank else "광고 영역에 없음"
             extra = f", 전체 {overall[0]}번째" if overall else ""
-            print(f"  {mark} {kw}{' (중요)' if kw in important else ''}: {where}{extra} / 목표 {target}위 안 "
-                  f"(광고 {results[-1]['ad_count']}개, 상품 {results[-1]['total']}개 확인)")
+            if items:
+                print(f"  {'✓' if ok else '✗'} {kw}{' (중요)' if kw in important else ''}: {where}{extra} / 목표 {target}위 안 "
+                      f"(광고 {results[-1]['ad_count']}개, 상품 {results[-1]['total']}개 확인)")
             if not ok:
                 outside.append(kw)
             out_rows.append({"keyword": kw, "important": kw in important, "ad_rank": ad_rank,
                              "overall": overall[0] if overall else None, "target": target, "ok": ok})
-            if not items:  # 상품을 하나도 못 읽음 → 화면 상태를 보여주고 멈춤
+            if not items:  # 그래도 못 읽음 → 화면 상태를 보여주고 멈춤
                 d = rank.diagnose(page)
                 print(f"\n⚠ 검색 화면에서 상품을 못 읽었습니다. 화면 상태:")
                 print(f"   제목: {d['title']}\n   주소: {d['url']}\n   링크 {d['links']}개, 상품처럼 보이는 링크 예: {d['sample']}")
@@ -333,6 +338,44 @@ def cmd_rank(sel, args):
         w.writerows(out_rows)
     print(f"\n순위권 밖 {len(outside)}개: {', '.join(outside) if outside else '없음'}")
     print(f"저장: {path}  (참고용: 보는 사람마다 순위가 다를 수 있습니다)")
+
+
+def cmd_rank_tabs(sel, args):
+    """반자동 순위 확인: 평소 쓰는 크롬에 키워드 검색 탭을 열고, '내 순위' 북마크로 확인."""
+    import webbrowser
+    from urllib.parse import quote
+
+    from adbot import rank
+
+    cfg = load("config/rank.yaml")
+    rows = read_csv(kw_path(args)) if kw_path(args).exists() else []
+    keywords = cfg["keywords"] or list(dict.fromkeys(r["keyword"] for r in rows))
+    mine = {str(p) for p in (cfg["product_nos"] or [r["product_no"] for r in rows])}
+    if not keywords or not mine:
+        print("확인할 키워드/상품이 없습니다. 먼저 [1. 가져오기] 를 누르세요.")
+        return
+    target = cfg["normal_target"]
+    link = rank.bookmarklet(mine, target)
+    page = ROOT / "data" / "내순위_북마크.html"
+    page.parent.mkdir(exist_ok=True)
+    page.write_text(f"""<!doctype html><meta charset="utf-8"><title>내 순위 북마크 설치</title>
+<body style="font-family:'Malgun Gothic',sans-serif;max-width:640px;margin:40px auto;line-height:1.7">
+<h2>'내 순위' 북마크 설치 (처음 한 번)</h2>
+<ol><li>크롬에서 <b>Ctrl + Shift + B</b> 를 눌러 북마크바를 켭니다.</li>
+<li>아래 파란 버튼을 마우스로 <b>끌어서 북마크바에 놓습니다.</b> (누르지 말고 끌기)</li></ol>
+<p><a href="{link}" style="display:inline-block;padding:12px 22px;background:#2F6BFF;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">내 순위</a></p>
+<h3>사용법</h3><p>G마켓 검색 결과 화면에서 북마크바의 <b>[내 순위]</b> 를 누르면,
+내 상품({', '.join(sorted(mine))})에 빨간 테두리가 생기고 오른쪽 위에 광고 몇 위인지 나옵니다. 목표: 광고 {target}위 안.</p>
+<p style="color:#888">상품번호나 목표가 바뀌면 프로그램에서 [순위 확인]을 다시 누르면 이 페이지가 새로 만들어집니다. 북마크도 다시 끌어 놓으세요.</p>
+</body>""", encoding="utf-8")
+    if args.setup:
+        webbrowser.open(page.as_uri())
+        print(f"북마크 설치 안내 페이지를 열었습니다: {page}")
+        return
+    for kw in keywords:
+        webbrowser.open_new_tab(cfg["search_url"].format(keyword=quote(kw)))
+    print(f"크롬에 검색 탭 {len(keywords)}개를 열었습니다: {', '.join(keywords)}")
+    print("각 탭에서 북마크바의 [내 순위] 를 누르면 순위가 표시됩니다. (북마크가 없으면 [북마크 설치] 먼저)")
 
 
 def cmd_backup(sel, args):
@@ -396,7 +439,7 @@ def cmd_inspect(sel, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "plan", "rank", "backup", "inspect"])
+    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "plan", "rank", "rank-tabs", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
@@ -407,12 +450,13 @@ def main():
     ap.add_argument("--report", help="plan: 광고센터에서 받은 리포트 엑셀 파일")
     ap.add_argument("--open", action="store_true", help="plan: 만든 조정안 엑셀을 바로 열기")
     ap.add_argument("--debug", action="store_true", help="rank: 모든 키워드의 상위 15개 출력")
+    ap.add_argument("--setup", action="store_true", help="rank-tabs: 북마크 설치 안내 페이지만 열기")
     ap.add_argument("--level", default="keyword", choices=["keyword", "product", "group"], help="plan: 판단 단위")
     args = ap.parse_args()
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "pull": cmd_pull, "setup": cmd_setup, "check": cmd_check,
-     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "plan": cmd_plan, "rank": cmd_rank, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
+     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "plan": cmd_plan, "rank": cmd_rank, "rank-tabs": cmd_rank_tabs, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":
