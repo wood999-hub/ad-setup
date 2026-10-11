@@ -85,8 +85,8 @@ def _to_int(v) -> int | None:
 
 
 def read_file(path: Path) -> tuple[pd.DataFrame, dict]:
-    """파일 1개 → 표준 열 이름의 표. (어떤 머리글을 어디에 연결했는지도 같이 돌려준다)"""
-    frames, mapping = [], {}
+    """파일 1개 → (표준 열 이름의 표, 머리글 연결 결과, 원래 머리글 목록)"""
+    frames, mapping, headers = [], {}, []
     for raw in _raw_tables(path):
         df = _with_header(raw)
         if df is None:
@@ -105,7 +105,7 @@ def read_file(path: Path) -> tuple[pd.DataFrame, dict]:
     out.insert(0, "source_file", path.name)
     if out["group"].isna().all() or (out["group"].astype(str).str.strip() == "").all():
         out["group"] = path.stem  # 파일 안에 그룹명이 없으면 파일 이름을 그룹명으로
-    return out[OUTPUT_COLUMNS], mapping
+    return out[OUTPUT_COLUMNS], mapping, headers
 
 
 def collect(folder: Path) -> tuple[pd.DataFrame, list[dict]]:
@@ -113,9 +113,9 @@ def collect(folder: Path) -> tuple[pd.DataFrame, list[dict]]:
     frames, report = [], []
     for f in files:
         try:
-            df, mapping = read_file(f)
+            df, mapping, headers = read_file(f)
             frames.append(df)
-            report.append({"file": f.name, "rows": len(df), "mapping": mapping})
+            report.append({"file": f.name, "rows": len(df), "mapping": mapping, "headers": headers})
         except Exception as e:  # 한 파일이 실패해도 나머지는 계속
             report.append({"file": f.name, "error": str(e)})
     merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=OUTPUT_COLUMNS)

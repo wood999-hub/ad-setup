@@ -136,10 +136,11 @@ def cmd_backup(sel, args):
         if "error" in r:
             print(f"  ✗ {r['file']}: {r['error']}")
         else:
-            missing = [k for k, v in r["mapping"].items() if v is None]
-            note = f" (못 찾은 칸: {', '.join(missing)})" if missing else ""
-            sample = merged[merged["source_file"] == r["file"]]["keyword"].head(3).tolist() if not merged.empty else []
-            print(f"  ✓ {r['file']}: 키워드 {r['rows']}개{note}  예) {', '.join(sample)}")
+            missing = [k for k, v in r["mapping"].items() if v is None and k != "group"]
+            kws = merged[merged["source_file"] == r["file"]]["keyword"].drop_duplicates()
+            print(f"  ✓ {r['file']}: {r['rows']}줄, 키워드 {len(kws)}종  예) {', '.join(kws.head(5))}")
+            if missing:
+                print(f"      못 찾은 칸: {', '.join(missing)} / 파일의 실제 머리글: {r['headers']}")
 
     if merged.empty:
         print("\n읽은 키워드가 없습니다.")
@@ -148,16 +149,17 @@ def cmd_backup(sel, args):
     # 같은 내용을 두 번 받은 파일 찾기
     sigs = {}
     for name, g in merged.groupby("source_file"):
-        sig = tuple(sorted(zip(g["ad_id"].astype(str), g["keyword"])))
+        sig = tuple(sorted(map(tuple, g[["ad_id", "product_no", "keyword", "bid"]].astype(str).values)))
         sigs.setdefault(sig, []).append(name)
     for names in sigs.values():
         if len(names) > 1:
-            print(f"  ⚠ 내용이 똑같은 파일: {', '.join(names)} (같은 그룹을 두 번 받았을 수 있음)")
+            print(f"  ⚠ 내용이 똑같은 파일: {', '.join(names)} → {names[0]} 만 사용")
+            merged = merged[~merged["source_file"].isin(names[1:])]
 
     print("\n== 그룹별 요약 ==")
     for group, g in merged.groupby("group", sort=False):
         status = g["status"].fillna("?").value_counts().to_dict()
-        print(f"  {group}: 키워드 {len(g)}개 {status}")
+        print(f"  {group}: {len(g)}줄, 키워드 {g['keyword'].nunique()}종, 상품 {g['product_no'].nunique()}개 {status}")
 
     out = ROOT / "data" / "keywords_backup.csv"
     out.parent.mkdir(exist_ok=True)
