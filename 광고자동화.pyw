@@ -164,7 +164,7 @@ class App:
             self.pill.config(text="● 준비됨", fg="#7EE2A8")
 
     # ---------- 실행 ----------
-    NAMES = {"pull": "가져오는", "setup": "미리보기", "check": "확인하는", "login": "로그인", "git": "업데이트"}
+    NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
@@ -174,9 +174,9 @@ class App:
             cmd = [PY, "main.py", *args]
             if args[0] != "login":
                 cmd.append("--headless")  # 브라우저 창 없이 조용히 실행
-        name = "반영하는" if "--apply" in args else self.NAMES.get(args[0] if args else cmd[0], "실행")
+        name = "반영" if "--apply" in args else self.NAMES.get(args[0] if args else cmd[0], "실행")
         self.set_busy(True, name)
-        self.write(f"\n▶ {name.rstrip('는')} 시작\n", "cmd")
+        self.write(f"\n▶ {name} 시작\n", "cmd")
 
         def work():
             self.proc = subprocess.Popen(cmd, cwd=ROOT, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
