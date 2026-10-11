@@ -37,6 +37,13 @@ def _open_keywords(page: Page, s: dict, product_row) -> None:
 
 def _close_layer(page: Page, s: dict, button: str) -> None:
     page.click(s[button])
+    # '팝업을 종료하겠습니까?' 같은 확인창이 뜨면 '확인'
+    confirm = page.get_by_role("button", name="확인", exact=True)
+    try:
+        confirm.last.wait_for(state="visible", timeout=2000)
+        confirm.last.click()
+    except Exception:
+        pass
     page.wait_for_selector(s["layer"], state="hidden")
 
 

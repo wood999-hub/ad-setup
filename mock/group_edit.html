@@ -22,6 +22,10 @@
   </div></div></div>
   <div class="box__button-wrap"><button class="button button--xxlarge" id="layerCancel">취소</button><button class="button button--blue" id="layerApply">적용하기</button></div>
 </div></div></div>
+<div id="confirmLayer" hidden><div class="box__layer-wrap"><div class="box__layer">
+  <p>팝업을 종료하겠습니까? 현재 작업중인 내용은 저장되지 않습니다.</p>
+  <div class="box__button-wrap"><button class="button button--xxlarge" id="cNo">취소</button><button class="button button--blue" id="cYes">확인</button></div>
+</div></div></div>
 <script src="store.js"></script>
 <script>
 const draft = loadGroup(); let current = null;
@@ -44,7 +48,9 @@ function openLayer(idx) {
      <td><input type="text" value="${won(bid)}"></td><td><button class="button button--tiny">삭제</button></td></tr>`).join("");
   layer.hidden = false;
 }
-layerCancel.onclick = () => { layer.hidden = true; };
+layerCancel.onclick = () => { confirmLayer.hidden = false; };   // 실제 센터처럼 확인창
+cYes.onclick = () => { confirmLayer.hidden = true; layer.hidden = true; };
+cNo.onclick = () => { confirmLayer.hidden = true; };
 layerApply.onclick = () => {
   [...kws.querySelectorAll("tr")].forEach((tr, i) => {
     draft.products[current].keywords[i][2] = parseInt(tr.querySelector("input").value.replace(/\D/g, ""), 10);
