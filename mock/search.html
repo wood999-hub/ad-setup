@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>G마켓 검색 (연습용)</title></head><body>
+<h1>검색 결과 (연습용)</h1>
+<ul id="list"></ul>
+<script>
+// 키워드마다 내 상품(2168720238) 위치가 다르게: 키트=광고2위, 과학키트=광고6위, 공예=광고 없음(일반 3번째)
+const kw = decodeURIComponent((location.search.match(/keyword=([^&]*)/) || [])[1] || "");
+const myAd = {"키트": 2, "과학키트": 6, "미술놀이": 4}[kw];
+const list = document.getElementById("list");
+let html = "";
+for (let i = 1; i <= 10; i++) {   // 광고 10개
+  const code = (myAd === i) ? "2168720238" : String(3000000000 + i);
+  html += `<li class="box__item-container"><span class="text__ad">AD</span><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">광고상품 ${i} 만들기 키트</a></li>`;
+}
+for (let i = 1; i <= 10; i++) {   // 일반 상품
+  const code = (!myAd && kw === "공예" && i === 3) ? "2168720238" : String(4000000000 + i);
+  html += `<li class="box__item-container"><a href="https://item.gmarket.co.kr/Item?goodscode=${code}">일반상품 ${i} 공예 키트</a></li>`;
+}
+list.innerHTML = html;
+</script></body></html>

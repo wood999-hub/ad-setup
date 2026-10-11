@@ -9,6 +9,7 @@
   python main.py off / on           # 모든 캠페인 광고 끄기 / 켜기 (주말 OFF 용)
   python main.py plan --report 리포트.xlsx [--level keyword|product|group]
                                     # 리포트 성과 → 최대입찰가·일예산 조정안 (검토용 엑셀)
+  python main.py rank               # G마켓 검색에서 내 상품 광고 순위 확인 (참고용)
   python main.py backup --folder 폴더  # 옛 광고센터에서 받은 키워드 엑셀들을 하나로 합쳐 백업
 
 --site mock 을 붙이면 실제 광고센터 대신 mock/ 연습 페이지에서 돌아간다.
@@ -273,6 +274,57 @@ def cmd_plan(sel, args):
         __import__("os").startfile(out)  # 프로그램 창에서 실행하면 조정안을 바로 연다
 
 
+def cmd_rank(sel, args):
+    """G마켓 검색 결과에서 내 상품 위치 확인 (참고용)."""
+    from statistics import mean
+
+    from adbot import rank
+
+    cfg = load("config/rank.yaml")
+    rows = read_csv(kw_path(args)) if kw_path(args).exists() else []
+    keywords = cfg["keywords"] or list(dict.fromkeys(r["keyword"] for r in rows))
+    mine = {str(p) for p in (cfg["product_nos"] or [r["product_no"] for r in rows])}
+    if not keywords or not mine:
+        print("확인할 키워드/상품이 없습니다. 먼저 [1. 가져오기] 를 누르거나 config/rank.yaml 에 적으세요.")
+        return
+    important = set(cfg["important"])
+    stamp = f"{datetime.now():%Y%m%d_%H%M}"
+    out_rows, outside = [], []
+    print(f"내 상품 {', '.join(sorted(mine))} · 기준: 중요 {cfg['important_target']}위 / 일반 {cfg['normal_target']}위 (광고 영역 순서)")
+    with site.open_page(headless=args.headless, mock=args.site == "mock") as page:
+        for i, kw in enumerate(keywords):
+            results = []
+            for _ in range(cfg["repeats"]):
+                items = rank.search(page, sel.get("rank_url") or cfg["search_url"], kw)
+                results.append(rank.position(items, mine))
+            ads = [r["ad"] for r in results if r["ad"]]
+            ad_rank = round(mean(ads), 1) if ads else None
+            overall = [r["overall"] for r in results if r["overall"]]
+            target = cfg["important_target"] if kw in important else cfg["normal_target"]
+            ok = ad_rank is not None and ad_rank <= target
+            mark = "✓" if ok else "✗"
+            where = f"광고 {ad_rank}위" if ad_rank else "광고 영역에 없음"
+            extra = f", 전체 {overall[0]}번째" if overall else ""
+            print(f"  {mark} {kw}{' (중요)' if kw in important else ''}: {where}{extra} / 목표 {target}위 안 "
+                  f"(광고 {results[-1]['ad_count']}개, 상품 {results[-1]['total']}개 확인)")
+            if not ok:
+                outside.append(kw)
+            out_rows.append({"keyword": kw, "important": kw in important, "ad_rank": ad_rank,
+                             "overall": overall[0] if overall else None, "target": target, "ok": ok})
+            if i == 0 or args.debug:  # 첫 키워드는 화면과 비교할 수 있게 상위 15개를 보여줌
+                print("     [화면 비교용] 상위 15개:", "  ".join(
+                    f"{n}.{'AD ' if it['ad'] else ''}{it['code']}{'◀내상품' if it['code'] in mine else ''}"
+                    for n, it in enumerate(items[:15], 1)))
+                site.screenshot(page, f"rank_{kw}_{stamp}")
+    path = ROOT / "data" / f"rank_{stamp}.csv"
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=list(out_rows[0]))
+        w.writeheader()
+        w.writerows(out_rows)
+    print(f"\n순위권 밖 {len(outside)}개: {', '.join(outside) if outside else '없음'}")
+    print(f"저장: {path}  (참고용: 보는 사람마다 순위가 다를 수 있습니다)")
+
+
 def cmd_backup(sel, args):
     from pathlib import Path
 
@@ -334,7 +386,7 @@ def cmd_inspect(sel, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "plan", "backup", "inspect"])
+    ap.add_argument("command", choices=["login", "pull", "setup", "check", "adjust", "on", "off", "plan", "rank", "backup", "inspect"])
     ap.add_argument("--site", choices=["real", "mock"], default="real")
     ap.add_argument("--apply", action="store_true", help="실제로 반영 (없으면 미리보기)")
     ap.add_argument("--headless", action="store_true", help="브라우저 창 없이 실행")
@@ -344,12 +396,13 @@ def main():
     ap.add_argument("--folder", default="backup", help="backup: 키워드 엑셀 파일들이 있는 폴더")
     ap.add_argument("--report", help="plan: 광고센터에서 받은 리포트 엑셀 파일")
     ap.add_argument("--open", action="store_true", help="plan: 만든 조정안 엑셀을 바로 열기")
+    ap.add_argument("--debug", action="store_true", help="rank: 모든 키워드의 상위 15개 출력")
     ap.add_argument("--level", default="keyword", choices=["keyword", "product", "group"], help="plan: 판단 단위")
     args = ap.parse_args()
 
     sel = load("config/selectors.yaml" if args.site == "real" else "mock/selectors.yaml")
     {"login": lambda s, a: site.save_login(s), "pull": cmd_pull, "setup": cmd_setup, "check": cmd_check,
-     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "plan": cmd_plan, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
+     "adjust": cmd_adjust, "on": cmd_on, "off": cmd_off, "plan": cmd_plan, "rank": cmd_rank, "backup": cmd_backup, "inspect": cmd_inspect}[args.command](sel, args)
 
 
 if __name__ == "__main__":

@@ -38,8 +38,11 @@ def open_page(headless: bool = False, mock: bool = False):
     state_file = MOCK_STATE if mock else AUTH_FILE
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
+        ua = None
+        if headless:  # 숨김 모드 브라우저는 이름에 'Headless' 가 붙어 차단될 수 있어 일반 크롬처럼 보이게
+            ua = browser.new_page().evaluate("navigator.userAgent").replace("HeadlessChrome", "Chrome")
         context = browser.new_context(
-            storage_state=str(state_file) if state_file.exists() else None, locale="ko-KR")
+            storage_state=str(state_file) if state_file.exists() else None, locale="ko-KR", user_agent=ua)
         if mock:
             context.route(f"{MOCK_HOST}/**", _serve_mock)
         page = context.new_page()

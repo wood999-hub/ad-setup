@@ -39,3 +39,4 @@ group_edit:
 report:
   row: "#report tbody tr"
   columns: {ad_id: 0, bid: 1, impressions: 2, clicks: 3, cost: 4, conversions: 5, revenue: 6}
+rank_url: "mock/search.html?keyword={keyword}"

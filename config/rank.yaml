@@ -1,0 +1,12 @@
+# G마켓 검색 결과에서 내 상품 위치 확인 (참고용 - 개인화 때문에 고객이 보는 순위와 다를 수 있음)
+search_url: "https://www.gmarket.co.kr/n/search?keyword={keyword}"
+repeats: 1                 # 키워드마다 몇 번 검색해서 평균낼지 (늘리면 느려짐)
+
+# 순위권 기준: 중요 키워드는 important_target 위 안, 나머지는 normal_target 위 안
+important_target: 4
+normal_target: 4          # 모든 키워드 3~4위 목표 (2026-10-11 요청). 일반 키워드를 8위로 하려면 8
+important: []              # 예) [키트, 과학키트]  ← 중요 키워드 이름을 적으세요
+
+# 확인할 키워드/상품: 비워두면 config/keywords.csv(가져오기 결과)의 키워드·상품번호를 사용
+keywords: []
+product_nos: []

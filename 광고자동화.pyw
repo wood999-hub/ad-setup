@@ -91,6 +91,7 @@ class App:
         FlatButton(right, "로그인", self.login).pack(side="right")
         FlatButton(right, "광고 켜기", lambda: self.switch(True)).pack(side="right", padx=(0, 6))
         FlatButton(right, "광고 끄기", lambda: self.switch(False)).pack(side="right", padx=(0, 6))
+        FlatButton(right, "순위 확인", lambda: self.run("rank"), primary=True).pack(side="right", padx=(0, 6))
 
     def _steps(self):
         row = tk.Frame(self.root, bg=BG)
@@ -167,7 +168,7 @@ class App:
 
     # ---------- 실행 ----------
     NAMES = {"pull": "가져오기", "setup": "미리보기", "check": "확인", "login": "로그인", "git": "업데이트",
-             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사", "plan": "리포트 분석"}
+             "on": "광고 켜기", "off": "광고 끄기", "inspect": "화면 조사", "plan": "리포트 분석", "rank": "순위 확인"}
 
     def run(self, *args, cmd: list[str] | None = None):
         if self.busy:
