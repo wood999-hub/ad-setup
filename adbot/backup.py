@@ -11,14 +11,22 @@ import pandas as pd
 # 표준 이름: 엑셀 머리글에서 찾을 단어들 (앞에 있을수록 우선)
 COLUMNS = {
     "group": ["광고그룹명", "그룹명", "광고그룹"],
-    "ad_id": ["파워클릭 광고 ID", "파워클릭 광고ID", "광고 ID", "광고ID"],
+    "ad_id": ["파워클릭 광고 ID", "파워클릭 광고ID", "광고 ID", "광고ID", "ID"],
     "product_no": ["상품번호"],
+    "product_name": ["상품명"],
     "keyword": ["키워드"],
     "status": ["운영상태", "상태"],
     "bid": ["희망클릭비용", "입찰가", "클릭비용"],
+    "auto_bid": ["자동입찰 설정여부"],
+    "auto_bid_rank": ["자동입찰 희망순위"],
+    "auto_bid_max": ["자동입찰 최대비용"],
+    "quality": ["품질평가지수"],
+    "impressions": ["노출수"],
     "clicks": ["클릭수"],
     "cost": ["총비용"],
 }
+# '노출수/클릭수/클릭율' 처럼 한 칸에 여러 값이 '/' 로 붙어있는 경우
+COMBINED = {"노출수/클릭수": ["impressions", "clicks"]}
 OUTPUT_COLUMNS = ["source_file", *COLUMNS]
 EXTENSIONS = {".xls", ".xlsx", ".csv", ".html", ".htm"}
 
@@ -94,13 +102,22 @@ def read_file(path: Path) -> tuple[pd.DataFrame, dict]:
         headers = list(df.columns)
         mapping = {std: _pick(headers, cands) for std, cands in COLUMNS.items()}
         out = pd.DataFrame({std: (df[src] if src else None) for std, src in mapping.items()})
+        for prefix, targets in COMBINED.items():
+            src = next((h for h in headers if h.replace(" ", "").startswith(prefix)), None)
+            if not src:
+                continue
+            parts = df[src].astype(str).str.split("/")
+            for i, std in enumerate(targets):
+                if mapping.get(std) in (None, src):
+                    out[std] = parts.str[i]
+                    mapping[std] = src
         frames.append(out)
     if not frames:
         raise ValueError(f"'키워드' 머리글을 찾지 못함: {path.name}")
     out = pd.concat(frames, ignore_index=True)
     out["keyword"] = out["keyword"].fillna("").astype(str).str.strip()
     out = out[~out["keyword"].isin(["", "nan"])].copy()
-    for col in ("bid", "clicks", "cost"):
+    for col in ("bid", "auto_bid_max", "impressions", "clicks", "cost"):
         out[col] = out[col].map(_to_int)
     out.insert(0, "source_file", path.name)
     if out["group"].isna().all() or (out["group"].astype(str).str.strip() == "").all():

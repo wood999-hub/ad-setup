@@ -165,7 +165,7 @@ def cmd_backup(sel, args):
     out.parent.mkdir(exist_ok=True)
     merged.to_csv(out, index=False, encoding="utf-8-sig")
     print(f"\n총 {len(merged)}개 → {out} (엑셀로 열 수 있음)")
-    if (merged["group"] == merged["source_file"].str.rsplit(".", n=1).str[0]).all():
+    if merged["group"].astype(str).str.contains("admanagement").any():
         print("※ 파일 안에 그룹명이 없어서 파일 이름을 그룹명으로 썼습니다. 파일 이름을 그룹명으로 바꿔두세요.")
 
 
