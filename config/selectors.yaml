@@ -3,7 +3,8 @@
 # (mock/selectors.yaml 이 완성된 예시)
 urls:
   login: https://adcenter.esmplus.com/   # 새 G마켓 광고센터 (AI Product Ads)
-  ad_list: TODO   # 광고(그룹) 목록 화면 주소
+  campaigns: https://adcenter.esmplus.com/ad/management   # 광고 관리(캠페인 목록) - 확인됨
+  ad_list: TODO   # 키워드 목록 화면 주소 (캠페인 → 그룹 → 키워드)
   report: TODO    # 성과 리포트 화면 주소
 
 # 파워클릭 일반그룹: 한 줄 = 키워드 1개 (입찰가가 키워드마다 있음)
