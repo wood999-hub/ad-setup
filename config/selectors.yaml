@@ -7,6 +7,17 @@ urls:
   ad_list: TODO   # 키워드 목록 화면 주소 (캠페인 → 그룹 → 키워드)
   report: TODO    # 성과 리포트 화면 주소
 
+# 광고 관리(캠페인 목록) - inspect 결과로 확인됨 (2026-10-11)
+campaign_list:
+  row: "div.box__result table.table tbody tr.table-row"
+  id_attr: data-campaign-group-id      # 예) 110004379735
+  name: "button.button__name"          # 캠페인명 (누르면 그룹 목록으로)
+  toggle: "input.form__toggle"         # ON/OFF 스위치
+  columns: [체크박스, ON/OFF, 캠페인명, 상태, 캠페인 유형, 노출수, 클릭수, 클릭률, 평균클릭비용,
+            판매자 전환수, 전환율, 판매자 전환금액, 광고비용, 광고 수익율]
+  download_report: "main.main > div.box__top-side > button.button"   # '운영현황 다운로드' (엑셀)
+  period_tabs: "div.box__radio-tab > button.button__tab"            # 어제/오늘/1주일/이번달
+
 # 파워클릭 일반그룹: 한 줄 = 키워드 1개 (입찰가가 키워드마다 있음)
 ad_list:
   row: TODO       # 키워드 한 줄. 예) table#keywordList tbody tr
