@@ -15,7 +15,7 @@ def test_recent_days_excluded_and_plan(tmp_path):
     rows = [["리포트 (테스트)"] + [""] * 8,
             ["날짜", "광고 그룹명", "상품 번호", "키워드", "키워드 입찰가", "노출 수", "클릭 수", "광고 비용", "광고 상품 전환 금액"]]
     for day in range(1, 11):  # 10/1~10/10, 매일 클릭 10, 광고비 5,000
-        rows.append([f"2026-10-{day:02d}", "G", "111", "키트", "500", "100", "10", "5,000",
+        rows.append([f"2026-10-{day:02d}", "G", "111", "키트", "500", "50", "10", "5,000",
                      "50,000" if day >= 5 else "0"])  # 최근 날짜에만 전환
     p = tmp_path / "report.xlsx"
     pd.DataFrame(rows).to_excel(p, header=False, index=False)
@@ -27,4 +27,4 @@ def test_recent_days_excluded_and_plan(tmp_path):
     assert plan(perfs, S)[0].action == "lower"   # 앞 3일만 보면 ROAS 0% → 내림 (기간 선택이 결론을 바꾼다)
 
     perfs, _ = to_perfs(df, "keyword", 0, today=date(2026, 10, 11))
-    assert perfs[0].clicks == 100 and plan(perfs, S)[0].action == "raise"   # 전체 기간: ROAS 600%, 노출 1,000 미만
+    assert perfs[0].clicks == 100 and plan(perfs, S)[0].action == "raise"   # 전체 기간: ROAS 600%, 노출 500 (< 1,000)
